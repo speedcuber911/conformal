@@ -155,10 +155,17 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
       </header>
 
       <div className="chart-canvas" ref={canvasRef}>
-        {query.error ? (
+        {query.loading && !query.rows.length ? (
+          <div className="chart-loading">Running SQL and preparing chart</div>
+        ) : query.error ? (
           <div className="chart-empty">
             <strong>Waiting for data runtime</strong>
             <span>{query.error}</span>
+          </div>
+        ) : !query.rows.length ? (
+          <div className="chart-empty">
+            <strong>No rows returned</strong>
+            <span>The generated SQL ran successfully but returned an empty result set.</span>
           </div>
         ) : (
           <VegaEmbed spec={spec as VegaEmbedProps["spec"]} options={{ actions: false }} />
