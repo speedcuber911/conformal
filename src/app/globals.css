@@ -777,7 +777,7 @@ textarea:focus-visible {
 }
 
 .chart-span-1 {
-  grid-column: span 2;
+  grid-column: span 3;
 }
 
 .chart-panel-compact {
