@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Production
+
+Production runs on the shared ap-south-1 EC2 host behind the existing Dockerized nginx edge:
+
+- URL: https://dcmshriram.conformal.live
+- App path: `/home/ubuntu/partner-apps/dcmshriram`
+- Container: `partner-dcmshriram`
+- Docker network: `cutcompanion_default`
+- Edge config reference: `deploy/nginx.dcmshriram.conf`
+
+Pushes to `main` run `.github/workflows/deploy.yml`, validate with `pnpm lint` and `pnpm build`, sync the app to EC2, rebuild the app container, and reload nginx.
