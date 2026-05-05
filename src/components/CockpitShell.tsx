@@ -52,16 +52,21 @@ export function CockpitShell() {
       <MobileShell live={live} />
 
       <aside className="sfs-sidebar">
-        <div>
+        <div className="brand-lockup">
           <div className="sfs-mark">SFS</div>
-          <div className="project-label">Project Leap</div>
+          <div>
+            <div className="project-label">Project Leap</div>
+            <p>Shriram Farm Solutions</p>
+          </div>
         </div>
 
         <nav className="sidebar-nav" aria-label="Primary">
           <a href="#" className="active">
+            <MessageSquare size={17} />
             Chat
           </a>
           <Link href="/dashboard">
+            <BarChart3 size={17} />
             Dashboard
           </Link>
         </nav>
