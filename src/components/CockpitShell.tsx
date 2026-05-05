@@ -4,6 +4,7 @@ import Link from "next/link";
 import { BarChart3, Command, Gauge, Moon, PanelLeft, RadioTower, Search, SunMedium } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { DuckDBStore } from "@/lib/duckdb-store";
 import { ChatPanel } from "./ChatPanel";
 import type { ChartBundle } from "./types";
 
@@ -17,6 +18,29 @@ export function CockpitShell() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
+
+  useEffect(() => {
+    if (!live) return;
+
+    const tables = [
+      "secondary_sales",
+      "field_force_activity",
+      "channel_partners",
+      "farmer_engagement",
+      "procurement_spend",
+      "wave1_microbattles",
+      "commodity_prices",
+      "farmer_nps",
+    ];
+    let index = 0;
+    const timer = window.setInterval(() => {
+      DuckDBStore.mutate(tables[index % tables.length]);
+      DuckDBStore.mutate(tables[(index + 3) % tables.length]);
+      index += 1;
+    }, 4200);
+
+    return () => window.clearInterval(timer);
+  }, [live]);
 
   const pinnedIds = useMemo(() => new Set(pinnedCharts.map((chart) => chart.id)), [pinnedCharts]);
 

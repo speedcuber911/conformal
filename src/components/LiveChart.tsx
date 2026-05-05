@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { Check, Copy, DatabaseZap, Pin, PinOff, RefreshCw, Table2, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { VegaEmbedProps } from "react-vega";
 import { cn } from "@/lib/utils";
 import { getDuckDbStore, rowsToCsv, tablesForSql } from "./duckdb-client";
@@ -34,6 +34,8 @@ type QueryState = {
 export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove }: LiveChartProps) {
   const [query, setQuery] = useState<QueryState>({ rows: [], loading: true, tables: [] });
   const [copied, setCopied] = useState<"sql" | "csv" | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [plotWidth, setPlotWidth] = useState(720);
 
   const runQuery = useCallback(async () => {
     setQuery((current) => ({ ...current, loading: true, error: undefined }));
@@ -97,7 +99,19 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
     };
   }, [chart.sql, live, runQuery]);
 
-  const spec = useMemo(() => buildSpec(chart, query.rows, compact), [chart, compact, query.rows]);
+  useEffect(() => {
+    const node = canvasRef.current;
+    if (!node) return;
+
+    const updateWidth = () => setPlotWidth(Math.max(280, Math.floor(node.clientWidth - 170)));
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const spec = useMemo(() => buildSpec(chart, query.rows, compact, plotWidth), [chart, compact, plotWidth, query.rows]);
 
   const copy = async (kind: "sql" | "csv") => {
     const text = kind === "sql" ? chart.sql : rowsToCsv(query.rows);
@@ -140,7 +154,7 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
         </div>
       </header>
 
-      <div className="chart-canvas">
+      <div className="chart-canvas" ref={canvasRef}>
         {query.error ? (
           <div className="chart-empty">
             <strong>Waiting for data runtime</strong>
@@ -154,12 +168,14 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
   );
 }
 
-function buildSpec(chart: ChartBundle, rows: Record<string, unknown>[], compact?: boolean): SpecObject {
+function buildSpec(chart: ChartBundle, rows: Record<string, unknown>[], compact: boolean | undefined, plotWidth: number): SpecObject {
   const base: SpecObject = chart.spec && typeof chart.spec === "object" ? chart.spec : {};
+  const chartWidth = hasFacet(base) ? Math.max(180, Math.floor(plotWidth / 3) - 28) : plotWidth;
+
   if (Object.keys(base).length) {
     return {
       ...base,
-      width: "container",
+      width: chartWidth,
       height: compact ? 210 : 300,
       data: { values: rows },
       background: "transparent",
@@ -173,7 +189,7 @@ function buildSpec(chart: ChartBundle, rows: Record<string, unknown>[], compact?
 
   return {
     $schema: "https://vega.github.io/schema/vega-lite/v6.json",
-    width: "container",
+    width: plotWidth,
     height: compact ? 210 : 300,
     background: "transparent",
     data: { values: rows.length ? rows : [{ [x]: "No rows", [y]: 0 }] },
@@ -185,6 +201,16 @@ function buildSpec(chart: ChartBundle, rows: Record<string, unknown>[], compact?
     },
     config: chartConfig,
   };
+}
+
+function hasFacet(spec: SpecObject) {
+  const encoding = spec.encoding;
+  return Boolean(
+    spec.facet ||
+      (encoding &&
+        typeof encoding === "object" &&
+        "facet" in encoding),
+  );
 }
 
 const chartConfig = {
