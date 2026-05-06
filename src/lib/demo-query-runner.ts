@@ -1,6 +1,8 @@
 import { demoTables, type Row } from "@/lib/demo-data";
+import workbookTablesRaw from "@/lib/workbook-data.json";
 
 export type TableGetter = (name: string) => Row[];
+const workbookTables = workbookTablesRaw as Record<string, Row[]>;
 
 export function latestDate(rows: Row[]) {
   return String(rows.at(-1)?.date ?? rows.at(-1)?.week ?? rows.at(-1)?.month ?? "");
@@ -31,7 +33,7 @@ export function runDemoSql(sql: string, table: TableGetter): Row[] {
   }
 }
 
-export function runGeneratedSql(sql: string, table: TableGetter = (name) => demoTables[name] ?? []) {
+export function runGeneratedSql(sql: string, table: TableGetter = (name) => workbookTables[name] ?? demoTables[name] ?? []) {
   return runGenericSelect(sql, table);
 }
 

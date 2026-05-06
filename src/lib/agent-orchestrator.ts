@@ -46,14 +46,14 @@ const ROUTE_PROMPTS: Record<RouteId, string> = {
 };
 
 const ROUTE_LABELS: Record<RouteId, string> = {
-  finance: "financial_performance",
-  field_force: "field_force_activity",
-  procurement: "procurement_spend",
-  nps: "farmer_nps",
+  finance: "fact_finance_pl",
+  field_force: "fact_field_visits",
+  procurement: "fact_procurement",
+  nps: "fact_targets",
   microbattle: "wave1_microbattles",
-  churn: "channel_partners",
-  commodity: "commodity_prices",
-  sales: "secondary_sales",
+  churn: "fact_collections",
+  commodity: "fact_commodity_prices",
+  sales: "fact_targets",
 };
 
 const ROUTE_CATALOG = Object.entries(ROUTE_PROMPTS).map(([route, prompt]) => ({ route, example: prompt, primary_table: ROUTE_LABELS[route as RouteId] }));
@@ -389,14 +389,14 @@ function runSqlAttempt(sql: string) {
 
 function defaultSqlForRoute(route: RouteId) {
   const sqlByRoute: Record<RouteId, string> = {
-    finance: "SELECT month, revenue_cr, ebitda_cr, ebitda_margin_pct FROM financial_performance ORDER BY month LIMIT 24",
-    field_force: "SELECT region, SUM(visits_planned) AS planned, SUM(visits_done) AS actual, SUM(orders_booked) AS orders FROM field_force_activity WHERE date >= '2026-02-01' GROUP BY region ORDER BY actual DESC LIMIT 10",
-    procurement: "SELECT category, SUM(spend) AS spend, SUM(savings_vs_baseline) AS savings FROM procurement_spend GROUP BY category ORDER BY savings DESC LIMIT 10",
-    nps: "SELECT quarter, region, AVG(nps) AS nps FROM farmer_nps GROUP BY quarter, region ORDER BY quarter LIMIT 50",
+    finance: "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(ebitda_inr) AS ebitda_inr, AVG(ebitda_pct) AS ebitda_pct FROM fact_finance_pl GROUP BY month ORDER BY month LIMIT 24",
+    field_force: "SELECT visit_outcome, COUNT(*) AS visits, AVG(duration_min) AS avg_duration_min FROM fact_field_visits GROUP BY visit_outcome ORDER BY visits DESC LIMIT 10",
+    procurement: "SELECT material_category, SUM(total_value_inr) AS total_value_inr, AVG(premium_vs_market_pct) AS premium_vs_market_pct FROM fact_procurement GROUP BY material_category ORDER BY total_value_inr DESC LIMIT 10",
+    nps: "SELECT region, category, AVG(achievement_pct) AS achievement_pct, SUM(actual_net_value_inr) AS actual_net_value_inr FROM fact_targets GROUP BY region, category ORDER BY achievement_pct DESC LIMIT 12",
     microbattle: "SELECT name, owner_function, status, percent_complete FROM wave1_microbattles ORDER BY percent_complete ASC LIMIT 12",
-    churn: "SELECT dealer_id, tier, ytd_sales, payment_dso, churn_risk FROM channel_partners WHERE region = 'North' ORDER BY churn_risk DESC LIMIT 12",
-    commodity: "SELECT commodity, AVG(price_inr) AS price_inr, AVG(dod_change_pct) AS dod_change_pct FROM commodity_prices GROUP BY commodity ORDER BY dod_change_pct DESC LIMIT 10",
-    sales: "SELECT region, SUM(revenue_inr) AS revenue_inr, SUM(units) AS units FROM secondary_sales WHERE date >= '2026-04-01' GROUP BY region ORDER BY revenue_inr DESC LIMIT 10",
+    churn: "SELECT status, AVG(days_overdue) AS avg_days_overdue, SUM(invoice_value_inr) AS invoice_value_inr, COUNT(*) AS invoices FROM fact_collections GROUP BY status ORDER BY avg_days_overdue DESC LIMIT 10",
+    commodity: "SELECT commodity, AVG(spot_price_inr) AS spot_price_inr FROM fact_commodity_prices GROUP BY commodity ORDER BY spot_price_inr DESC LIMIT 10",
+    sales: "SELECT region, category, SUM(actual_net_value_inr) AS actual_net_value_inr, SUM(target_net_value_inr) AS target_net_value_inr, AVG(achievement_pct) AS achievement_pct FROM fact_targets GROUP BY region, category ORDER BY actual_net_value_inr DESC LIMIT 12",
   };
   return sqlByRoute[route];
 }
