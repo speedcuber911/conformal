@@ -1,0 +1,169 @@
+# CHART_RULES.yaml
+# The visualization decision rubric. Loaded by both:
+#   - Agent 4 (PresentationDesigner): consults this when picking chart types per analysis result
+#   - Chart Spec Builder (deterministic Python): uses this to construct Recharts-compatible specs
+#
+# Single source of truth for the project's visualization vocabulary. Adding a new chart type means adding it here first.
+
+unit_humanizers:
+  _cr: "₹ Cr"
+  _pct: "%"
+  _days: "days"
+  _units: "units"
+  _inr: "₹"
+  _kg: "kg"
+  _mt: "MT"
+
+chart_types:
+
+  - chart_hint: kpi_card
+    when_to_use: |
+      Result has 1 row and 1-3 columns of headline numbers.
+      Use for "What is X?" answers where a single number is the answer.
+    result_shape:
+      row_count: 1
+      columns: 1-3
+      column_types: ["numeric measure"]
+    example_question: "What's our FY26 revenue?"
+    example_columns: ["revenue_cr"]
+    example_value_layout:
+      primary_value: "₹1,554 Cr"
+      subtitle: "FY26 net revenue"
+    prefer_over: ["table when result is one number"]
+    avoid_when: ["multiple rows", "user explicitly asked to see breakdown"]
+    chart_options_schema:
+      tone: "neutral | positive | negative"   # for color cue
+      comparison_value: "optional secondary number for context"
+      comparison_label: "optional label for the comparison"
+
+  - chart_hint: bar_chart
+    when_to_use: |
+      Result has 2 columns (1 categorical dimension + 1 numeric measure), 2-12 rows.
+      The dimension has natural discrete categories (region, category, tier, distributor name)
+      without an inherent time order.
+    result_shape:
+      row_count: 2-12
+      columns: 2
+      column_types: ["categorical (x-axis)", "numeric (y-axis)"]
+    example_question: "Revenue by region for FY26"
+    example_columns: ["region", "revenue_cr"]
+    prefer_over:
+      - "table (when row count <= 12, prefer visual)"
+      - "line_chart (when no time dimension)"
+    avoid_when:
+      - "row count > 12 → use table or filter to top-N"
+      - "x-axis is a date/month → use line_chart"
+      - "single number → use kpi_card"
+    chart_options_schema:
+      x_field: "column name for x-axis"
+      y_field: "column name for y-axis"
+      orientation: "vertical | horizontal"
+      sort: "asc | desc | none"
+
+  - chart_hint: line_chart
+    when_to_use: |
+      Result has 2+ columns where the first is a time dimension (date, month, quarter),
+      with at least 6 time points to make a trend visible.
+    result_shape:
+      row_count: 6+
+      columns: 2-4
+      column_types: ["temporal (x-axis)", "numeric (y-axis, possibly multiple)"]
+    example_question: "Show monthly revenue trend FY26"
+    example_columns: ["month", "revenue_cr"]
+    prefer_over:
+      - "bar_chart for time series with 6+ points"
+    avoid_when:
+      - "fewer than 4 time points (use bar_chart)"
+      - "x-axis is non-temporal categorical"
+    chart_options_schema:
+      x_field: "time column name"
+      y_field: "measure column name"
+      additional_series: "list of extra y-columns for multi-line"
+
+  - chart_hint: stacked_bar
+    when_to_use: |
+      Result has 3 columns (2 categorical dimensions + 1 numeric measure), where the user
+      wants to see the total per primary dimension AND the breakdown across the secondary.
+      Each primary-dimension category should have multiple secondary-dimension values stacked.
+    result_shape:
+      row_count: variable (depends on primary × secondary cardinality)
+      columns: 3
+      column_types: ["categorical primary", "categorical secondary", "numeric measure"]
+    example_question: "Revenue by region split by category"
+    example_columns: ["region", "category", "revenue_cr"]
+    prefer_over:
+      - "bar_chart when secondary dimension is meaningful"
+    avoid_when:
+      - "secondary dimension > 6 distinct values (too many stacks unreadable)"
+      - "only one dimension matters → use bar_chart"
+    chart_options_schema:
+      x_field: "primary dimension"
+      y_field: "measure"
+      stack_field: "secondary dimension (will be stacked)"
+
+  - chart_hint: scatter
+    when_to_use: |
+      Result has 3 columns: 1 categorical (point label) + 2 numeric measures.
+      User wants to see relationship/correlation between two metrics, identify outliers,
+      or surface clusters.
+    result_shape:
+      row_count: 10-200
+      columns: 3+
+      column_types: ["categorical (label)", "numeric (x)", "numeric (y)"]
+    example_question: "DSO vs revenue per distributor — who's at risk?"
+    example_columns: ["distributor_name", "revenue_cr", "avg_dso_days"]
+    prefer_over:
+      - "table when relationship between measures is the point"
+    avoid_when:
+      - "user wants ranking on a single measure → use ranking + bar"
+      - "fewer than 10 points (relationship not meaningful)"
+    chart_options_schema:
+      x_field: "first measure"
+      y_field: "second measure"
+      label_field: "categorical column for point labels"
+      color_field: "optional categorical for point coloring"
+
+  - chart_hint: table
+    when_to_use: |
+      Result is too wide (4+ columns) or too long (12+ rows with no clean filter), or
+      the user explicitly asked to "list" or "show me the records." Also used as fallback
+      when no chart adds value over the raw data.
+    result_shape:
+      row_count: any
+      columns: 1+
+    example_question: "List the 30 regulatory pipeline entries with status"
+    example_columns: ["any"]
+    prefer_over: []  # table is the fallback
+    avoid_when:
+      - "<= 12 rows + clear measure → prefer bar_chart"
+      - "temporal ordering → prefer line_chart"
+      - "single number → prefer kpi_card"
+    chart_options_schema:
+      max_rows: "integer, default 20"
+      highlight_rows: "list of values to visually emphasize"
+      column_aliases: "dict mapping raw column names to display labels"
+
+  - chart_hint: narrative_only
+    when_to_use: |
+      The analysis result informs the narrative but doesn't merit its own visual element.
+      Used to keep the layout clean — not every data point needs to be on screen.
+    result_shape: "any"
+    example_question: "(used for supporting details mentioned in prose only)"
+    chart_options_schema: {}
+
+# ---
+# Tiebreaker rules — applied in order when multiple chart types could fit:
+# 1. If result is a single number → kpi_card
+# 2. If first column is temporal and 6+ rows → line_chart
+# 3. If 2 categorical dims + 1 measure with secondary cardinality <=6 → stacked_bar
+# 4. If 1 categorical + 1 measure and rows <=12 → bar_chart
+# 5. If 2 measures + 1 categorical and rows >=10 → scatter
+# 6. Otherwise → table
+
+# ---
+# Layout rules — applied by Agent 4 when assembling the final layout:
+# - Headline KPI card always first if present
+# - Maximum 4 visual elements per response
+# - "narrative_only" elements don't count toward the 4
+# - Tables go last unless they ARE the answer (e.g. ranking question)
+# - Each visual element gets a specific title; no generic "Chart" or "Table"

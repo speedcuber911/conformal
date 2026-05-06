@@ -13,10 +13,17 @@
 # testing
 /coverage
 /qa-artifacts
+/.pytest_cache
 
 # next.js
 /.next/
 /out/
+
+# python
+__pycache__/
+*.py[cod]
+/.venv
+*.egg-info/
 
 # production
 /build

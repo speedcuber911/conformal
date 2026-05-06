@@ -24,11 +24,13 @@ export type TraceEvent = {
   label: string;
   sql?: string;
   durationMs?: number;
+  payload?: unknown;
 };
 
 export type ChatEvent =
   | TraceEvent
   | { type: "chart"; chart: ChartPayload }
+  | { type: "narrative_chunk"; text: string }
   | { type: "final"; text: string }
   | { type: "error"; message: string };
 

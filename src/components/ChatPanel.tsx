@@ -605,6 +605,11 @@ export function applyChatEvent(message: ChatMessage, eventData: Record<string, u
     return { ...message, charts: [...(message.charts ?? []), chart], trace: [...(message.trace ?? []), sqlTrace] };
   }
 
+  if (type === "narrative_chunk") {
+    const content = String(eventData.content ?? eventData.text ?? eventData.narrative ?? "");
+    return { ...message, content: `${message.content}${content}` };
+  }
+
   if (type === "final" || type === "message" || type === "narrative") {
     const content = String(eventData.content ?? eventData.text ?? eventData.narrative ?? eventData.answer ?? "");
     return { ...message, content: [message.content, content].filter(Boolean).join(message.content ? "\n\n" : "") };

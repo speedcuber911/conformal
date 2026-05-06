@@ -2,16 +2,18 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, install the Python backend dependencies and start the ECEO sidecar:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm backend:dev
+```
+
+That script uses `uv run`, so it will create/use the Python environment declared in `pyproject.toml`.
+
+In another shell, run the Next.js development server:
+
+```bash
 pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -49,13 +51,22 @@ Pushes to `main` run `.github/workflows/deploy.yml`, validate with `pnpm lint` a
 
 ### Azure OpenAI agent runtime
 
-`/api/chat` uses Azure OpenAI when the server runtime has these variables. If they are absent, the app falls back to the curated deterministic demo path.
+`/api/chat` now prefers the ECEO backend sidecar at `ECEO_BACKEND_URL` and adapts its four-agent SSE stream into the cockpit's NDJSON stream. If the sidecar is unavailable, the app falls back to the older in-process TypeScript demo agent unless `ECEO_BACKEND_REQUIRED=1` is set.
+
+This is additive: keep the existing cockpit capabilities intact. The original TypeScript agent orchestrator, deterministic demo fallback, generated chart rendering, live/pinned chart behavior, dashboard reuse, and `/api/chat` client contract should continue to work. Use `ECEO_BACKEND_DISABLED=1` to force the legacy in-process path for local testing or emergency fallback.
+
+The backend supports Anthropic, Bedrock, and Azure OpenAI. For this repo, Azure OpenAI is the default when these variables are present:
 
 ```bash
+ECEO_BACKEND_URL=http://127.0.0.1:8000
+ECEO_BACKEND_DISABLED=0
+ECEO_BACKEND_REQUIRED=0
+LLM_PROVIDER=azure_openai
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
 AZURE_OPENAI_API_KEY=<secret>
 AZURE_OPENAI_GPT55_DEPLOYMENT=gpt-5.5
 AZURE_OPENAI_API_STYLE=responses
+AZURE_OPENAI_TIMEOUT_MS=60000
 ```
 
 Optional overrides:
@@ -68,3 +79,14 @@ AZURE_OPENAI_MAX_OUTPUT_TOKENS=1200
 ```
 
 Production deploys source `/etc/leap.env` before `docker compose`, so keep these values there and never commit secrets.
+
+### ECEO backend capabilities
+
+The Python backend in `backend/` was brought over from the ECEO copy and keeps the four-agent architecture:
+
+- `Interpreter` clarifies ambiguous executive questions.
+- `AnalysisPlanner` decomposes a question into up to four concrete analyses.
+- `QueryExecutor` writes DuckDB SQL per analysis, executes it, and retries once on SQL failure.
+- `PresentationDesigner` streams the CEO-style narrative and selects KPI/chart/table layout.
+
+The schema, prompts, chart rules, and workbook source live in `Docs/`. The Next app keeps using `/api/chat`; the route handler proxies to `POST /query/stream` on the sidecar and converts backend events into the existing UI event contract.

@@ -5,6 +5,8 @@
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "next dev",
+    "backend:dev": "uv run uvicorn backend.main:app --reload --port 8000",
+    "backend:test": "uv run pytest backend/tests",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
