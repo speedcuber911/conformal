@@ -113,6 +113,8 @@ export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {
   const processingStatus = useProcessingStatus(isSending);
 
   const activeCharts = useMemo(() => messages.flatMap((message) => message.charts ?? []), [messages]);
+  const displayCharts = useMemo(() => pickDisplayCharts(activeCharts), [activeCharts]);
+  const kpiChart = displayCharts[0] ?? activeCharts[0];
   const hasConversation = messages.length > 0 || isSending;
 
   async function submitPrompt(event?: FormEvent, override?: string) {
@@ -254,8 +256,8 @@ export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {
         <div className={cn("chart-stack", activeCharts.length && "chart-stack-active")}>
           {activeCharts.length ? (
             <>
-              <KpiStrip chart={activeCharts[0]} />
-              {activeCharts.slice(0, 2).map((chart) => (
+              <KpiStrip chart={kpiChart} />
+              {displayCharts.slice(0, 2).map((chart) => (
                 <LiveChart key={chart.id} chart={chart} live={live} pinned={pinnedIds.has(chart.id)} onPin={onPinChart} />
               ))}
             </>
@@ -269,6 +271,24 @@ export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {
       </section>
     </div>
   );
+}
+
+function pickDisplayCharts(charts: ChartBundle[]) {
+  const visualCharts = charts.filter((chart) => {
+    const rows = chart.rows ?? [];
+    if (rows.length > 1) return true;
+    if (chart.span === 1) return false;
+    return hasBothAxes(chart);
+  });
+
+  return visualCharts.length ? visualCharts : charts;
+}
+
+function hasBothAxes(chart: ChartBundle) {
+  const encoding = chart.spec?.encoding;
+  if (!encoding || typeof encoding !== "object" || Array.isArray(encoding)) return false;
+  const record = encoding as Record<string, unknown>;
+  return Boolean(record.x && record.y);
 }
 
 function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void }) {
@@ -359,25 +379,41 @@ function buildKpiCards(chart?: ChartBundle): KpiCard[] {
   const text = `${chart?.title ?? ""} ${chart?.description ?? ""} ${chart?.sql ?? ""}`.toLowerCase();
   const period = describeKpiPeriod(rows);
 
-  const revenueKey = findColumn(numericColumns, /revenue.*inr|net_sales_value_inr/);
-  const ebitdaKey = findColumn(numericColumns, /ebitda.*inr/);
+  const revenueKey = findColumn(numericColumns, /revenue.*(?:inr|cr)|net_sales_value_inr/);
+  const ebitdaKey = findColumn(numericColumns, /ebitda.*(?:inr|cr)/);
   if (revenueKey && ebitdaKey) {
     const revenue = sumColumn(rows, revenueKey);
     const ebitda = sumColumn(rows, ebitdaKey);
     const marginKey = findColumn(numericColumns, /ebitda.*pct|margin/);
     const margin = marginKey ? averageColumn(rows, marginKey) : revenue ? (ebitda / revenue) * 100 : 0;
     return [
-      { label: "Revenue", ...formatInCrore(revenue), detail: period, tone: "neutral" },
-      { label: "EBITDA", ...formatInCrore(ebitda), detail: period, tone: "neutral" },
+      { label: "Revenue", ...formatCurrencyMetric(revenueKey, revenue), detail: period, tone: "neutral" },
+      { label: "EBITDA", ...formatCurrencyMetric(ebitdaKey, ebitda), detail: period, tone: "neutral" },
       { label: "EBITDA margin", value: `${formatNumber(margin, 1)}%`, detail: "weighted from result", tone: margin >= 0 ? "up" : "down" },
     ];
   }
 
-  const totalValueKey = findColumn(numericColumns, /total.*value.*inr|invoice.*value.*inr|collection.*amount.*inr|inventory.*value.*inr|sell.*value.*inr/);
+  if (revenueKey) {
+    const total = sumColumn(rows, revenueKey);
+    const average = averageColumn(rows, revenueKey);
+    const peak = maxRow(rows, revenueKey);
+    return [
+      { label: "Revenue", ...formatCurrencyMetric(revenueKey, total), detail: period, tone: "neutral" },
+      { label: "Avg / month", ...formatCurrencyMetric(revenueKey, average), detail: "monthly run-rate", tone: "neutral" },
+      {
+        label: "Peak month",
+        ...formatCurrencyMetric(revenueKey, peak.value),
+        detail: peak.label,
+        tone: "up",
+      },
+    ];
+  }
+
+  const totalValueKey = findColumn(numericColumns, /total.*value.*(?:inr|cr)|invoice.*value.*(?:inr|cr)|collection.*amount.*(?:inr|cr)|inventory.*value.*(?:inr|cr)|sell.*value.*(?:inr|cr)|spend.*cr|savings.*cr/);
   const premiumKey = findColumn(numericColumns, /premium.*pct/);
   if (text.includes("procurement") || premiumKey) {
     const cards: KpiCard[] = [];
-    if (totalValueKey) cards.push({ label: "Spend value", ...formatInCrore(sumColumn(rows, totalValueKey)), detail: period, tone: "neutral" });
+    if (totalValueKey) cards.push({ label: "Spend value", ...formatCurrencyMetric(totalValueKey, sumColumn(rows, totalValueKey)), detail: period, tone: "neutral" });
     if (premiumKey) cards.push({ label: "Market premium", value: `${formatNumber(averageColumn(rows, premiumKey), 1)}%`, detail: "avg from returned rows", tone: averageColumn(rows, premiumKey) > 0 ? "down" : "up" });
     return padKpis(cards, rows);
   }
@@ -427,6 +463,7 @@ function segmentKpis(rows: Record<string, unknown>[]): KpiCard[] {
   const columns = Object.keys(rows[0] ?? {});
   return columns
     .flatMap((column) => {
+      if (/(^|_)(date|month|quarter|week|period|year)($|_)/i.test(column)) return [];
       const values = rows
         .map((row) => row[column])
         .filter((value) => value !== null && value !== undefined && String(value).trim())
@@ -456,6 +493,17 @@ function averageColumn(rows: Record<string, unknown>[], column: string) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
+function maxRow(rows: Record<string, unknown>[], column: string): { value: number; label: string } {
+  const periodKey = Object.keys(rows[0] ?? {}).find((key) => /month|quarter|week|date|year/i.test(key));
+  const fallback = { value: 0, label: "highest in scope" };
+  return rows.reduce<{ value: number; label: string }>((best, row) => {
+    const value = numericValue(row[column]);
+    if (value <= best.value) return best;
+    const rawLabel = periodKey ? String(row[periodKey] ?? "") : "";
+    return { value, label: rawLabel ? formatPeriodLabel(rawLabel) : "highest in scope" };
+  }, fallback);
+}
+
 function numericValue(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
@@ -483,8 +531,13 @@ function formatInCrore(value: number): Pick<KpiCard, "value" | "unit"> {
   return { value: `₹${formatNumber(value / 10_000_000, 1)}`, unit: "Cr" };
 }
 
+function formatCurrencyMetric(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
+  if (/(^|_)cr$/i.test(column) || /_cr($|_)/i.test(column)) return { value: `₹${formatNumber(value, 1)}`, unit: "Cr" };
+  return formatInCrore(value);
+}
+
 function formatMetricValue(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
-  if (/inr|value|amount|revenue|ebitda|sales|spend/i.test(column)) return formatInCrore(value);
+  if (/inr|_cr$|value|amount|revenue|ebitda|sales|spend/i.test(column)) return formatCurrencyMetric(column, value);
   if (/pct|percent|coverage|margin|rate|premium/i.test(column)) return { value: `${formatNumber(value, 1)}%` };
   if (/qty|quantity|units|volume/i.test(column)) return { value: formatCompactNumber(value), unit: "units" };
   return { value: formatCompactNumber(value) };
@@ -497,6 +550,7 @@ function isAverageMetric(column: string) {
 function labelFromColumn(column: string) {
   const normalized = column.toLowerCase().replace(/^(sum|avg|count|min|max)_/, "");
   const known: Record<string, string> = {
+    revenue_cr: "Revenue",
     revenue_inr: "Revenue",
     sales_value: "Sales",
     sales_value_inr: "Sales",
@@ -504,6 +558,9 @@ function labelFromColumn(column: string) {
     net_value_inr: "Net sales",
     value_inr: "Value",
     invoice_value_inr: "Invoice value",
+    spend_cr: "Spend value",
+    savings_vs_market_cr: "Savings",
+    ebitda_cr: "EBITDA",
     ebitda_inr: "EBITDA",
     ebitda_pct: "EBITDA margin",
     qty_units: "Volume",
