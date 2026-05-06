@@ -46,3 +46,25 @@ Production runs on the shared ap-south-1 EC2 host behind the existing Dockerized
 - Edge config reference: `deploy/nginx.dcmshriram.conf`
 
 Pushes to `main` run `.github/workflows/deploy.yml`, validate with `pnpm lint` and `pnpm build`, sync the app to EC2, rebuild the app container, and reload nginx.
+
+### Azure OpenAI agent runtime
+
+`/api/chat` uses Azure OpenAI when the server runtime has these variables. If they are absent, the app falls back to the curated deterministic demo path.
+
+```bash
+AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
+AZURE_OPENAI_API_KEY=<secret>
+AZURE_OPENAI_GPT55_DEPLOYMENT=gpt-5.5
+AZURE_OPENAI_API_STYLE=responses
+```
+
+Optional overrides:
+
+```bash
+AZURE_OPENAI_API_STYLE=chat
+AZURE_OPENAI_API_VERSION=2024-10-21
+AZURE_OPENAI_TIMEOUT_MS=14000
+AZURE_OPENAI_MAX_OUTPUT_TOKENS=1200
+```
+
+Production deploys source `/etc/leap.env` before `docker compose`, so keep these values there and never commit secrets.

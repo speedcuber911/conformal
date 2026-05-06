@@ -7,6 +7,13 @@ COMPOSE_FILE="${COMPOSE_FILE:-deploy/docker-compose.dcmshriram.yml}"
 
 cd "$DEPLOY_PATH"
 
+if [ -f /etc/leap.env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . /etc/leap.env
+  set +a
+fi
+
 docker compose -f "$COMPOSE_FILE" build app
 docker compose -f "$COMPOSE_FILE" up -d app
 
