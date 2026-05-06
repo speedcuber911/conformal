@@ -27,6 +27,20 @@ export const dataDictionary: TableMeta[] = [
     ],
   },
   {
+    name: "financial_performance",
+    description: "Monthly SFS P&L time series for revenue, EBITDA, budget, and margin questions.",
+    grain: "month",
+    row_count: 24,
+    columns: [
+      { name: "month", type: "DATE", description: "Financial month" },
+      { name: "revenue_cr", type: "DOUBLE", description: "Net revenue in INR crore" },
+      { name: "budget_revenue_cr", type: "DOUBLE", description: "Budgeted net revenue in INR crore" },
+      { name: "ebitda_cr", type: "DOUBLE", description: "EBITDA in INR crore" },
+      { name: "budget_ebitda_cr", type: "DOUBLE", description: "Budgeted EBITDA in INR crore" },
+      { name: "ebitda_margin_pct", type: "DOUBLE", description: "EBITDA as a percentage of net revenue" },
+    ],
+  },
+  {
     name: "field_force_activity",
     description: "Daily MGO activity, dealer coverage, and booked orders.",
     grain: "day x MGO",

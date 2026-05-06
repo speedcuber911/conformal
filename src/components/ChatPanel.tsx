@@ -15,12 +15,12 @@ type ChatPanelProps = {
 };
 
 const starters = [
+  { domain: "Finance", prompt: "Show me the revenue and EBITDA time series." },
   { domain: "Field Force", prompt: "How is the field force tracking this quarter?" },
   { domain: "Procurement", prompt: "Show me procurement savings vs target by category." },
   { domain: "Farmer Engagement", prompt: "What's happening with farmer NPS across regions?" },
   { domain: "Project Leap", prompt: "Status of Wave 1 micro-battles." },
   { domain: "Channel Partners", prompt: "Channel partners at churn risk in North zone." },
-  { domain: "Markets", prompt: "What's moving in commodity markets today?" },
 ];
 
 export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {

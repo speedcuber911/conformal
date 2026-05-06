@@ -24,6 +24,7 @@ export const heroQuestions = [
 
 export function scriptedEvents(prompt: string): ChatEvent[] {
   const lower = prompt.toLowerCase();
+  if (isFinanceTimeSeriesAsk(lower)) return financeEvents(lower);
   if (lower.includes("field force")) return fieldForceEvents();
   if (lower.includes("procurement")) return procurementEvents();
   if (lower.includes("nps")) return npsEvents();
@@ -33,12 +34,34 @@ export function scriptedEvents(prompt: string): ChatEvent[] {
   return genericEvents();
 }
 
+function isFinanceTimeSeriesAsk(lower: string) {
+  const hasFinanceMetric = /\b(revenue|sales|ebitda|pbd?t|profit|margin)\b/.test(lower);
+  const hasTimeIntent = /\b(time series|trend|monthly|month|over time|run[- ]?rate|trajectory|fy|quarter)\b/.test(lower);
+  const hasExplicitFinance = /\b(ebitda|pbd?t|p&l|financial|margin)\b/.test(lower);
+  const asksRegionalCut = /\b(region|zone|state|product|channel|dealer|cohort)\b/.test(lower);
+
+  return hasExplicitFinance || (hasFinanceMetric && hasTimeIntent && !asksRegionalCut);
+}
+
 function baseTrace(table: string): ChatEvent[] {
   return [
     { type: "tool_start", id: `list-${table}`, tool: "list_tables", status: "running", label: "Inspecting available SFS tables" },
     { type: "tool_end", id: `list-${table}`, tool: "list_tables", status: "complete", label: "Found 8 business tables", durationMs: 82 },
     { type: "tool_start", id: `desc-${table}`, tool: "describe_table", status: "running", label: `Reading schema for ${table}` },
     { type: "tool_end", id: `desc-${table}`, tool: "describe_table", status: "complete", label: `Schema and sample rows loaded`, durationMs: 124 },
+  ];
+}
+
+function agenticTrace(table: string, description: string, visual: string): ChatEvent[] {
+  return [
+    { type: "tool_start", id: `planner-${table}`, tool: "list_tables", status: "running", label: "Planner agent: interpreting the user ask" },
+    { type: "tool_end", id: `planner-${table}`, tool: "list_tables", status: "complete", label: `Planner selected ${table}`, durationMs: 74 },
+    { type: "tool_start", id: `describe-${table}`, tool: "describe_table", status: "running", label: `Loading schema for ${table}` },
+    { type: "tool_end", id: `describe-${table}`, tool: "describe_table", status: "complete", label: description, durationMs: 118 },
+    { type: "tool_start", id: `checker-${table}`, tool: "run_sql", status: "running", label: "Checker agent: validating SQL against the selected dataset" },
+    { type: "tool_end", id: `checker-${table}`, tool: "run_sql", status: "complete", label: "Checker accepted the SQL and dataset grain", durationMs: 96 },
+    { type: "tool_start", id: `visual-${table}`, tool: "render_chart", status: "running", label: "Visual picker: choosing the chart type" },
+    { type: "tool_end", id: `visual-${table}`, tool: "render_chart", status: "complete", label: visual, durationMs: 63 },
   ];
 }
 
@@ -53,6 +76,122 @@ function finalResponse(insight: string, chartObservations: string[], watchOut?: 
       .filter(Boolean)
       .join("\n\n"),
   };
+}
+
+function financeEvents(lower: string): ChatEvent[] {
+  const wantsEbitda = /\b(ebitda|pbd?t|profit|margin)\b/.test(lower);
+  const wantsRevenue = /\b(revenue|sales|topline|top line)\b/.test(lower);
+  const chartMode = wantsEbitda && !wantsRevenue ? "ebitda" : wantsRevenue && !wantsEbitda ? "revenue" : "both";
+
+  const trendChart =
+    chartMode === "ebitda"
+      ? chart(
+          "finance-ebitda-trend",
+          "EBITDA trend vs budget",
+          "Monthly EBITDA is shown against budget so the demo answers the finance question directly rather than defaulting to a regional sales split.",
+          "-- hero:finance_ebitda_timeseries\nSELECT month, ebitda_cr, budget_ebitda_cr FROM financial_performance ORDER BY month",
+          {
+            data: { name: "data" },
+            layer: [
+              {
+                mark: { type: "area", color: "#B8232E", opacity: 0.1, interpolate: "monotone" },
+                encoding: { x: { field: "month", type: "temporal" }, y: { field: "ebitda_cr", type: "quantitative" } },
+              },
+              {
+                mark: { type: "line", color: "#B8232E", point: true, tooltip: true },
+                encoding: { x: { field: "month", type: "temporal" }, y: { field: "ebitda_cr", type: "quantitative" } },
+              },
+              {
+                mark: { type: "line", stroke: "#7a756f", strokeDash: [5, 4], tooltip: true },
+                encoding: { x: { field: "month", type: "temporal" }, y: { field: "budget_ebitda_cr", type: "quantitative" } },
+              },
+            ],
+          },
+          3,
+        )
+      : chartMode === "revenue"
+        ? chart(
+            "finance-revenue-trend",
+            "Revenue trend vs budget",
+            "Monthly revenue is plotted against budget from the finance table, avoiding the old fallback to revenue by zone.",
+            "-- hero:finance_revenue_timeseries\nSELECT month, revenue_cr, budget_revenue_cr FROM financial_performance ORDER BY month",
+            {
+              data: { name: "data" },
+              layer: [
+                {
+                  mark: { type: "area", color: "#B8232E", opacity: 0.1, interpolate: "monotone" },
+                  encoding: { x: { field: "month", type: "temporal" }, y: { field: "revenue_cr", type: "quantitative" } },
+                },
+                {
+                  mark: { type: "line", color: "#B8232E", point: true, tooltip: true },
+                  encoding: { x: { field: "month", type: "temporal" }, y: { field: "revenue_cr", type: "quantitative" } },
+                },
+                {
+                  mark: { type: "line", stroke: "#7a756f", strokeDash: [5, 4], tooltip: true },
+                  encoding: { x: { field: "month", type: "temporal" }, y: { field: "budget_revenue_cr", type: "quantitative" } },
+                },
+              ],
+            },
+            3,
+          )
+        : chart(
+            "finance-revenue-ebitda-trend",
+            "Revenue and EBITDA time series",
+            "Revenue and EBITDA are both pulled from the finance P&L grain, not from regional secondary-sales aggregation.",
+            "-- hero:finance_revenue_ebitda_timeseries\nSELECT month, revenue_cr, ebitda_cr FROM financial_performance ORDER BY month",
+            {
+              data: { name: "data" },
+              mark: { type: "line", point: true, tooltip: true },
+              encoding: {
+                x: { field: "month", type: "temporal" },
+                y: { field: "value_crore", type: "quantitative" },
+                color: { field: "metric", type: "nominal" },
+              },
+            },
+            3,
+          );
+
+  const marginChart = chart(
+    "finance-ebitda-margin",
+    "EBITDA margin trend",
+    "The margin view checks whether profit growth is coming from operating leverage rather than only revenue expansion.",
+    "-- hero:finance_margin_timeseries\nSELECT month, ebitda_margin_pct FROM financial_performance ORDER BY month",
+    {
+      data: { name: "data" },
+      mark: { type: "line", point: true, tooltip: true },
+      encoding: {
+        x: { field: "month", type: "temporal" },
+        y: { field: "ebitda_margin_pct", type: "quantitative", axis: { title: "EBITDA margin %" } },
+      },
+    },
+    2,
+  );
+
+  return [
+    ...agenticTrace(
+      "financial_performance",
+      "Checker loaded monthly revenue, EBITDA, budget, and margin columns",
+      "Visual picker chose a time-series line/area view with a zero-based y-axis",
+    ),
+    { type: "chart", chart: trendChart },
+    { type: "chart", chart: marginChart },
+    finalResponse(
+      chartMode === "ebitda"
+        ? "EBITDA is on a steady upward run-rate and is broadly tracking ahead of the early-period budget line. The important point is that the answer is using the monthly finance P&L table, so EBITDA is not being inferred from regional revenue cuts."
+        : chartMode === "revenue"
+          ? "Revenue is trending upward across the 24-month demo period, with the latest months running above the early baseline and close to budget. This is a finance time-series answer, not the earlier revenue-by-zone fallback."
+          : "Revenue and EBITDA are both improving over the monthly demo period, with EBITDA rising alongside revenue rather than decoupling from the top line. The result comes from the monthly finance P&L grain, which is the right dataset for leadership finance questions.",
+      [
+        chartMode === "ebitda"
+          ? "The EBITDA chart compares actual EBITDA crore to budget EBITDA crore month by month, so variance is visible without mixing in regional sales dimensions."
+          : chartMode === "revenue"
+            ? "The revenue chart plots actual revenue crore against budget revenue crore over time, showing trajectory rather than a one-period regional split."
+            : "The combined trend chart keeps revenue crore and EBITDA crore on the same monthly P&L grain, making the direction of both metrics easy to compare.",
+        "The margin chart provides the profitability check: EBITDA margin is stable to improving, which indicates operating leverage rather than only volume-led growth.",
+      ],
+      "For finance asks, keep the planner pinned to financial_performance unless the user explicitly asks for region, product, channel, or dealer cuts.",
+    ),
+  ];
 }
 
 function fieldForceEvents(): ChatEvent[] {

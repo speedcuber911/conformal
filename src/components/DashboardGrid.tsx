@@ -14,7 +14,7 @@ const PINNED_CHARTS_KEY = "project-leap-pinned-charts";
 export function DashboardGrid() {
   const [charts, setCharts] = useState<ChartBundle[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [live, setLive] = useState(true);
+  const [live, setLive] = useState(false);
   const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor));
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export function DashboardGrid() {
         </div>
         <button type="button" className={cn("live-toggle", live && "live-toggle-on")} onClick={() => setLive((current) => !current)}>
           <span />
-          Live
+          {live ? "Live" : "Stable"}
         </button>
       </header>
 

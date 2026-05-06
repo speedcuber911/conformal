@@ -28,24 +28,46 @@ function seasonality(index: number) {
   return 1 + Math.sin(index / 28) * 0.18 + Math.cos(index / 57) * 0.08;
 }
 
-export const demoTables: Record<string, Row[]> = {
-  secondary_sales: Array.from({ length: 730 }).flatMap((_, dayIndex) =>
-    regions.flatMap((region) =>
-      products.map((product) => {
-        const base = 120 + hash(`${region}-${product}`) % 80;
-        const regionalDrag = region === "North" ? 0.82 : region === "East" ? 0.9 : 1;
-        const hotProduct = product === "Bioseed Cotton" ? 1.28 : 1;
-        const units = Math.round(base * regionalDrag * hotProduct * seasonality(dayIndex));
-        return {
-          date: day(dayIndex - 729),
-          region,
-          product,
-          units,
-          revenue_inr: units * (850 + (hash(product) % 300)),
-        };
-      }),
-    ),
+const secondarySales = Array.from({ length: 730 }).flatMap((_, dayIndex) =>
+  regions.flatMap((region) =>
+    products.map((product) => {
+      const base = 120 + hash(`${region}-${product}`) % 80;
+      const regionalDrag = region === "North" ? 0.82 : region === "East" ? 0.9 : 1;
+      const hotProduct = product === "Bioseed Cotton" ? 1.28 : 1;
+      const units = Math.round(base * regionalDrag * hotProduct * seasonality(dayIndex));
+      return {
+        date: day(dayIndex - 729),
+        region,
+        product,
+        units,
+        revenue_inr: units * (850 + (hash(product) % 300)),
+      };
+    }),
   ),
+);
+
+const financialPerformance = Array.from({ length: 24 }).map((_, monthIndex) => {
+  const monthKey = month(monthIndex - 24);
+  const seasonalLift = 1 + Math.sin(monthIndex / 2.8) * 0.09 + Math.cos(monthIndex / 5.4) * 0.05;
+  const revenue_cr = Number((104 + monthIndex * 1.85 + seasonalLift * 8.4 + (monthIndex > 14 ? 5.2 : 0)).toFixed(1));
+  const budget_revenue_cr = Number((revenue_cr * (monthIndex < 8 ? 1.04 : 0.985)).toFixed(1));
+  const ebitda_margin_pct = Number((17.2 + monthIndex * 0.11 + Math.sin(monthIndex / 3.5) * 0.9).toFixed(1));
+  const ebitda_cr = Number((revenue_cr * ebitda_margin_pct / 100).toFixed(1));
+  const budget_ebitda_cr = Number((budget_revenue_cr * 0.176).toFixed(1));
+
+  return {
+    month: monthKey,
+    revenue_cr,
+    budget_revenue_cr,
+    ebitda_cr,
+    budget_ebitda_cr,
+    ebitda_margin_pct,
+  };
+});
+
+export const demoTables: Record<string, Row[]> = {
+  secondary_sales: secondarySales,
+  financial_performance: financialPerformance,
   field_force_activity: Array.from({ length: 365 }).flatMap((_, dayIndex) =>
     regions.flatMap((region, regionIndex) =>
       Array.from({ length: 8 }).map((__, mgoIndex) => {

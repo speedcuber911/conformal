@@ -12,7 +12,7 @@ import type { ChartBundle } from "./types";
 const PINNED_CHARTS_KEY = "project-leap-pinned-charts";
 
 export function CockpitShell() {
-  const [live, setLive] = useState(true);
+  const [live, setLive] = useState(false);
   const [pinnedCharts, setPinnedCharts] = usePinnedCharts();
 
   useEffect(() => {
@@ -107,7 +107,7 @@ export function CockpitShell() {
           <div className="top-actions">
             <button type="button" className={cn("live-toggle", live && "live-toggle-on")} onClick={() => setLive((current) => !current)}>
               <span />
-              Live
+              {live ? "Live" : "Stable"}
             </button>
             <div className="top-divider" />
             <div className="avatar">AK</div>
@@ -155,7 +155,7 @@ function MobileHeader({ live }: { live: boolean }) {
       </div>
       <div className={cn("mobile-live", live && "mobile-live-on")}>
         <span />
-        live
+        {live ? "live" : "stable"}
       </div>
     </header>
   );

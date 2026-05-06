@@ -71,6 +71,37 @@ function runHeroQuery(sql: string): Row[] {
       .slice(0, 10);
   }
 
+  if (normalized.includes("finance_revenue_ebitda_timeseries")) {
+    return table("financial_performance").map((row) => ({
+      month: row.month,
+      revenue_cr: row.revenue_cr,
+      ebitda_cr: row.ebitda_cr,
+    }));
+  }
+
+  if (normalized.includes("finance_revenue_timeseries")) {
+    return table("financial_performance").map((row) => ({
+      month: row.month,
+      revenue_cr: row.revenue_cr,
+      budget_revenue_cr: row.budget_revenue_cr,
+    }));
+  }
+
+  if (normalized.includes("finance_ebitda_timeseries")) {
+    return table("financial_performance").map((row) => ({
+      month: row.month,
+      ebitda_cr: row.ebitda_cr,
+      budget_ebitda_cr: row.budget_ebitda_cr,
+    }));
+  }
+
+  if (normalized.includes("finance_margin_timeseries")) {
+    return table("financial_performance").map((row) => ({
+      month: row.month,
+      ebitda_margin_pct: row.ebitda_margin_pct,
+    }));
+  }
+
   if (normalized.includes("procurement_savings")) {
     return Object.entries(groupBy(table("procurement_spend").filter((row) => String(row.month) >= "2026-01-01"), "category"))
       .map(([category, rows]) => ({

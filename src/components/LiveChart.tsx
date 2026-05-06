@@ -202,7 +202,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
         <ScatterChart margin={{ left: 4, right: 14, top: 10, bottom: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} type="number" dataKey={model.xKey} name={labelize(model.xKey)} />
-          <YAxis {...axisProps} type="number" dataKey={model.yKeys[0]} name={labelize(model.yKeys[0])} width={42} />
+          <YAxis {...axisProps} type="number" dataKey={model.yKeys[0]} name={labelize(model.yKeys[0])} width={42} domain={domainForSeries(model)} />
           <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent indicator="dot" />} />
           <Scatter data={model.data} dataKey={model.yKeys[0]}>
             {model.data.map((entry, index) => (
@@ -219,7 +219,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
         <BarChart data={model.data} layout="vertical" margin={{ left: 8, right: 20, top: 10, bottom: 4 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis {...axisProps} type="number" />
+          <XAxis {...axisProps} type="number" domain={domainForSeries(model)} />
           <YAxis {...axisProps} type="category" dataKey={model.xKey} width={70} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
           <Bar dataKey={model.yKeys[0]} radius={[0, 5, 5, 0]} fill={`var(--color-${cssVarKey(model.yKeys[0])})`} />
@@ -250,7 +250,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
         <LineChart data={model.data} margin={{ left: 0, right: 14, top: 10, bottom: 4 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
-          <YAxis {...axisProps} width={42} />
+          <YAxis {...axisProps} width={42} domain={domainForSeries(model)} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
           {model.yKeys.map((key) => (
             <Line key={key} dataKey={key} type="monotone" stroke={`var(--color-${cssVarKey(key)})`} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
@@ -389,7 +389,8 @@ function pickYKey(chart: ChartBundle, numericColumns: string[], xKey: string) {
     const normalized = column.toLowerCase();
     return (
       column !== xKey &&
-      (text.includes(normalized) || /(nps|value|coverage|actual|planned|order|score|risk|amount|sales|visit|percent|rate|revenue|booked)/i.test(column))
+      (text.includes(normalized) ||
+        /(nps|value|coverage|actual|planned|order|score|risk|amount|sales|visit|percent|rate|revenue|ebitda|margin|budget|crore|booked)/i.test(column))
     );
   });
   return preferred ?? numericColumns.find((column) => column !== xKey) ?? numericColumns[0] ?? "value";
@@ -439,8 +440,18 @@ function domainForSeries(model: ChartModel): [number | "auto", number | "auto"] 
 
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const padding = Math.max((max - min) * 0.18, max > 100 ? 8 : 2);
-  return [Math.floor(min - padding), Math.ceil(max + padding)];
+  if (min >= 0) return [0, niceCeiling(max * 1.08)];
+
+  const padding = Math.max((max - min) * 0.12, 2);
+  return [Math.floor(min - padding), niceCeiling(max + padding)];
+}
+
+function niceCeiling(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return niceNormalized * magnitude;
 }
 
 function cssVarKey(key: string) {

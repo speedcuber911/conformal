@@ -22,6 +22,7 @@ Schema map
 - fact_inventory: monthly distributor x SKU inventory snapshot with FIFO-derived aging.
 - fact_targets: fiscal_year x fiscal_quarter x region x category targets, including one FY28 ambition row.
 - fact_collections: invoice collections, 1:1 with primary_sales via transaction_id.
+- financial_performance: demo monthly SFS P&L table for revenue, EBITDA, budget, and margin time-series questions.
 - fact_field_visits: MGO distributor visit events and outcomes.
 - fact_commodity_prices: weekly commodity prices, Monday grain.
 - fact_procurement: PO-level procurement with contracted price, market spot, premium, and supplier.
@@ -40,6 +41,7 @@ Join rules
 
 Data quirks and guardrails
 - Revenue is not exactly unit price times quantity. Use net_value_inr directly for revenue questions.
+- For demo revenue, EBITDA, PBDIT, margin, and budget time-series questions, prefer financial_performance over secondary_sales unless the user explicitly asks for product, region, channel, or dealer sales cuts.
 - Outstanding invoices have payment_date = NULL. For closed-loop DSO, filter status = 'Paid'. For aging exposure, use days_overdue.
 - The FY28 target row has actual_net_value_inr = NULL. Do not divide by NULL or zero when calculating achievement.
 - fact_secondary_sales is monthly, not daily. Do not join it to primary sales at day grain.
