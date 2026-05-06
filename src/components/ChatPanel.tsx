@@ -375,8 +375,7 @@ function buildKpiCards(chart?: ChartBundle): KpiCard[] {
     const cards: KpiCard[] = [];
     if (totalValueKey) cards.push({ label: "Spend value", ...formatInCrore(sumColumn(rows, totalValueKey)), detail: period, tone: "neutral" });
     if (premiumKey) cards.push({ label: "Market premium", value: `${formatNumber(averageColumn(rows, premiumKey), 1)}%`, detail: "avg from returned rows", tone: averageColumn(rows, premiumKey) > 0 ? "down" : "up" });
-    cards.push({ label: "Rows returned", value: String(rows.length), detail: "live SQL result", tone: "neutral" });
-    return padKpis(cards);
+    return padKpis(cards, rows);
   }
 
   const coverageKey = findColumn(numericColumns, /coverage|visit.*pct|completion.*pct/);
@@ -387,7 +386,7 @@ function buildKpiCards(chart?: ChartBundle): KpiCard[] {
       ...(coverageKey ? [{ label: labelFromColumn(coverageKey), value: `${formatNumber(averageColumn(rows, coverageKey), 0)}%`, detail: period, tone: trendTone(rows, coverageKey) }] : []),
       ...(npsKey ? [{ label: labelFromColumn(npsKey), value: formatNumber(averageColumn(rows, npsKey), 0), detail: period, tone: trendTone(rows, npsKey) }] : []),
       ...(ordersKey ? [{ label: labelFromColumn(ordersKey), value: formatNumber(sumColumn(rows, ordersKey), 0), detail: period, tone: trendTone(rows, ordersKey) }] : []),
-    ]);
+    ], rows);
   }
 
   return padKpis(
@@ -400,11 +399,44 @@ function buildKpiCards(chart?: ChartBundle): KpiCard[] {
         tone: trendTone(rows, column),
       };
     }),
+    rows,
   );
 }
 
-function padKpis(cards: KpiCard[]) {
-  return [...cards, ...defaultKpis].slice(0, 3);
+function padKpis(cards: KpiCard[], rows: Record<string, unknown>[]) {
+  const scopedCards = [...cards];
+
+  for (const segment of segmentKpis(rows)) {
+    if (scopedCards.length >= 3) break;
+    if (scopedCards.some((card) => card.label.toLowerCase() === segment.label.toLowerCase())) continue;
+    scopedCards.push(segment);
+  }
+
+  if (scopedCards.length < 3) {
+    scopedCards.push({ label: "Records", value: formatCompactNumber(rows.length), detail: "in scope", tone: "neutral" });
+  }
+
+  return scopedCards.slice(0, 3);
+}
+
+function segmentKpis(rows: Record<string, unknown>[]): KpiCard[] {
+  const columns = Object.keys(rows[0] ?? {});
+  return columns
+    .flatMap((column) => {
+      const values = rows
+        .map((row) => row[column])
+        .filter((value) => value !== null && value !== undefined && String(value).trim())
+        .map((value) => String(value).trim());
+      if (!values.length || values.every((value) => Number.isFinite(Number(value)))) return [];
+      const unique = new Set(values);
+      if (unique.size < 2 || unique.size > Math.max(24, rows.length * 0.75)) return [];
+      return [{
+        label: labelFromColumn(column),
+        value: formatCompactNumber(unique.size),
+        detail: unique.size === 1 ? "segment" : "segments",
+        tone: "neutral" as const,
+      }];
+    });
 }
 
 function findColumn(columns: string[], pattern: RegExp) {
@@ -427,9 +459,9 @@ function numericValue(value: unknown) {
 
 function describeKpiPeriod(rows: Record<string, unknown>[]) {
   const periodKey = Object.keys(rows[0] ?? {}).find((key) => /month|quarter|week|date|year/i.test(key));
-  if (!periodKey) return `${rows.length} result ${rows.length === 1 ? "row" : "rows"}`;
+  if (!periodKey) return "total in scope";
   const values = Array.from(new Set(rows.map((row) => String(row[periodKey])).filter(Boolean)));
-  if (!values.length) return `${rows.length} result ${rows.length === 1 ? "row" : "rows"}`;
+  if (!values.length) return "total in scope";
   if (values.length === 1) return formatPeriodLabel(values[0]);
   return `${formatPeriodLabel(values[0])} - ${formatPeriodLabel(values[values.length - 1])}`;
 }
@@ -450,7 +482,8 @@ function formatInCrore(value: number): Pick<KpiCard, "value" | "unit"> {
 function formatMetricValue(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
   if (/inr|value|amount|revenue|ebitda|sales|spend/i.test(column)) return formatInCrore(value);
   if (/pct|percent|coverage|margin|rate|premium/i.test(column)) return { value: `${formatNumber(value, 1)}%` };
-  return { value: formatNumber(value, Math.abs(value) >= 100 ? 0 : 1) };
+  if (/qty|quantity|units|volume/i.test(column)) return { value: formatCompactNumber(value), unit: "units" };
+  return { value: formatCompactNumber(value) };
 }
 
 function isAverageMetric(column: string) {
@@ -461,8 +494,22 @@ function labelFromColumn(column: string) {
   const normalized = column.toLowerCase().replace(/^(sum|avg|count|min|max)_/, "");
   const known: Record<string, string> = {
     revenue_inr: "Revenue",
+    sales_value: "Sales",
+    sales_value_inr: "Sales",
+    net_sales_value: "Net sales",
+    net_value_inr: "Net sales",
+    value_inr: "Value",
+    invoice_value_inr: "Invoice value",
     ebitda_inr: "EBITDA",
     ebitda_pct: "EBITDA margin",
+    qty_units: "Volume",
+    quantity_units: "Volume",
+    region: "Regions",
+    category: "Categories",
+    business_unit: "Business units",
+    distributor_name: "Distributors",
+    supplier_name: "Suppliers",
+    material_category: "Categories",
     premium_vs_market_pct: "Market premium",
     coverage_pct: "Coverage",
     farmer_nps: "Farmer NPS",
@@ -476,6 +523,19 @@ function labelFromColumn(column: string) {
       .replace(/_/g, " ")
       .replace(/\b\w/g, (letter) => letter.toUpperCase())
   );
+}
+
+function formatCompactNumber(value: number) {
+  if (!Number.isFinite(value)) return "0";
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) return `${trimCompact(value / 1_000_000_000)}B`;
+  if (abs >= 1_000_000) return `${trimCompact(value / 1_000_000)}M`;
+  if (abs >= 1_000) return `${trimCompact(value / 1_000)}K`;
+  return formatNumber(value, Number.isInteger(value) ? 0 : 1);
+}
+
+function trimCompact(value: number) {
+  return value.toFixed(value >= 100 ? 0 : 1).replace(/\.0$/, "");
 }
 
 function formatNumber(value: number, digits: number) {
