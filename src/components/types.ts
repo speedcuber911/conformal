@@ -3,9 +3,12 @@ export type ChatRole = "user" | "assistant" | "system";
 export type TraceEvent = {
   id: string;
   type: string;
+  tool?: string;
   label: string;
   status?: "pending" | "running" | "complete" | "error";
   detail?: string;
+  sql?: string;
+  durationMs?: number;
   payload?: unknown;
   timestamp: number;
 };

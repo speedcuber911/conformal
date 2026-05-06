@@ -6,7 +6,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { DuckDBStore } from "@/lib/duckdb-store";
-import { applyChatEvent, ChatPanel, consumeNdjson, starters } from "./ChatPanel";
+import { applyChatEvent, ChatPanel, consumeNdjson, processingInsightFromTrace, starters, useProcessingStatus } from "./ChatPanel";
 import { LiveChart } from "./LiveChart";
 import type { ChartBundle, ChatMessage } from "./types";
 
@@ -286,7 +286,10 @@ function MobileChat({
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const trace = lastAssistant?.trace ?? [];
   const chartCount = lastAssistant?.charts?.length ?? 0;
+  const processingStatus = useProcessingStatus(isSending);
+  const backendStatus = processingInsightFromTrace(trace, processingStatus);
   const duration = trace.reduce((total, item) => {
+    if (typeof item.durationMs === "number") return total + item.durationMs;
     const match = item.detail?.match(/(\d+)ms/);
     return total + (match ? Number(match[1]) : 0);
   }, 0);
@@ -303,12 +306,12 @@ function MobileChat({
           <strong>{trace.length} tool calls · {duration || 182}ms</strong>
         </div>
       ) : isSending ? (
-        <div className="mobile-trace">
+        <div className="mobile-trace" aria-live="polite">
           <span aria-hidden="true" />
           <span aria-hidden="true" />
           <span aria-hidden="true" />
           <span aria-hidden="true" />
-          <strong>Agents are planning SQL</strong>
+          <strong>{backendStatus}</strong>
         </div>
       ) : null}
       {chartCount ? (
@@ -316,7 +319,7 @@ function MobileChat({
           {chartCount} {chartCount === 1 ? "chart" : "charts"} <span aria-hidden="true">→</span>
         </button>
       ) : null}
-      {lastAssistant?.content || isSending ? <p className="mobile-answer">{lastAssistant?.content || "Running planner, checker, and visual picker..."}</p> : null}
+      {lastAssistant?.content || isSending ? <p className={cn("mobile-answer", !lastAssistant?.content && isSending && "mobile-answer-loading")}>{lastAssistant?.content || backendStatus}</p> : null}
       <div className="mobile-followups" aria-label="Follow up prompts">
         {starters.slice(1, 5).map((starter) => (
           <button type="button" key={starter.prompt} onClick={() => onSubmit(undefined, starter.prompt)} disabled={isSending}>
