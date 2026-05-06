@@ -822,25 +822,42 @@ textarea:focus-visible {
   font-size: 12px;
 }
 
-.kpi-strip strong {
-  display: block;
+.kpi-value {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: baseline;
+  gap: 7px;
   margin-top: 16px;
   font-family: var(--font-serif);
-  font-size: clamp(36px, 3.1vw, 48px);
+  font-size: clamp(30px, 2.4vw, 40px);
   font-weight: 500;
-  line-height: 0.9;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.kpi-strip strong em {
-  font-size: 0.52em;
+.kpi-value .kpi-number {
+  display: inline;
+  max-width: none;
+  font: inherit;
+  letter-spacing: 0;
+  line-height: inherit;
+  text-transform: none;
+}
+
+.kpi-value em {
+  font-family: var(--font-sans);
+  font-size: 0.4em;
   font-style: normal;
+  font-weight: 720;
+  letter-spacing: 0.02em;
 }
 
 .kpi-strip small {
   display: block;
-  margin-top: 10px;
-  font-size: 13px;
-  font-weight: 800;
+  margin-top: 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 720;
 }
 
 .up {

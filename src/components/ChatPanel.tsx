@@ -339,8 +339,9 @@ function KpiStrip({ chart }: { chart?: ChartBundle }) {
       {cards.map((card) => (
         <article key={card.label}>
           <span>{card.label}</span>
-          <strong>
-            {card.value} {card.unit ? <em>{card.unit}</em> : null}
+          <strong className="kpi-value">
+            <span className="kpi-number">{card.value}</span>
+            {card.unit ? <em>{card.unit}</em> : null}
           </strong>
           <small className={card.tone}>{card.detail}</small>
         </article>
@@ -368,8 +369,8 @@ function buildKpiCards(chart?: ChartBundle): KpiCard[] {
     const marginKey = findColumn(numericColumns, /ebitda.*pct|margin/);
     const margin = marginKey ? averageColumn(rows, marginKey) : revenue ? (ebitda / revenue) * 100 : 0;
     return [
-      { label: "Revenue", ...formatInCrore(revenue), detail: period, tone: trendTone(rows, revenueKey) },
-      { label: "EBITDA", ...formatInCrore(ebitda), detail: period, tone: trendTone(rows, ebitdaKey) },
+      { label: "Revenue", ...formatInCrore(revenue), detail: period, tone: "neutral" },
+      { label: "EBITDA", ...formatInCrore(ebitda), detail: period, tone: "neutral" },
       { label: "EBITDA margin", value: `${formatNumber(margin, 1)}%`, detail: "weighted from result", tone: margin >= 0 ? "up" : "down" },
     ];
   }
@@ -435,8 +436,8 @@ function describeKpiPeriod(rows: Record<string, unknown>[]) {
   if (!periodKey) return `${rows.length} result ${rows.length === 1 ? "row" : "rows"}`;
   const values = Array.from(new Set(rows.map((row) => String(row[periodKey])).filter(Boolean)));
   if (!values.length) return `${rows.length} result ${rows.length === 1 ? "row" : "rows"}`;
-  if (values.length === 1) return values[0];
-  return `${values[0]} → ${values[values.length - 1]}`;
+  if (values.length === 1) return formatPeriodLabel(values[0]);
+  return `${formatPeriodLabel(values[0])} - ${formatPeriodLabel(values[values.length - 1])}`;
 }
 
 function trendTone(rows: Record<string, unknown>[], column: string): KpiCard["tone"] {
@@ -449,7 +450,7 @@ function trendTone(rows: Record<string, unknown>[], column: string): KpiCard["to
 }
 
 function formatInCrore(value: number): Pick<KpiCard, "value" | "unit"> {
-  return { value: `₹${formatNumber(value / 10_000_000, 1)}`, unit: "Cr" };
+  return { value: `Rs ${formatNumber(value / 10_000_000, 1)}`, unit: "Cr" };
 }
 
 function formatMetricValue(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
@@ -489,6 +490,13 @@ function formatNumber(value: number, digits: number) {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits,
   }).replace(/\\.0$/, "");
+}
+
+function formatPeriodLabel(value: string) {
+  const monthMatch = value.match(/^(20\d{2})-(\d{2})$/);
+  if (!monthMatch) return value;
+  const date = new Date(`${value}-01T00:00:00`);
+  return date.toLocaleString("en-IN", { month: "short", year: "numeric" });
 }
 
 function ToolTrace({ trace }: { trace: TraceEvent[] }) {
