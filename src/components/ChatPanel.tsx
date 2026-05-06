@@ -15,12 +15,13 @@ type ChatPanelProps = {
 };
 
 export const starters = [
+  { domain: "Finance", prompt: "Revenue over last 12 months" },
   { domain: "Finance", prompt: "Show me the revenue and EBITDA time series." },
+  { domain: "EBITDA", prompt: "Why did Q2 FY26 EBITDA miss budget?" },
+  { domain: "Procurement", prompt: "Show me procurement savings vs target by category. Time period: FY26 year-to-date" },
+  { domain: "Distributor Risk", prompt: "Show me distributors who are buying less, paying late, and selling slow" },
   { domain: "Field Force", prompt: "How is the field force tracking this quarter?" },
-  { domain: "Procurement", prompt: "Show me procurement savings vs target by category." },
-  { domain: "Farmer Engagement", prompt: "What's happening with farmer NPS across regions?" },
-  { domain: "Project Leap", prompt: "Status of Wave 1 micro-battles." },
-  { domain: "Channel Partners", prompt: "Channel partners at churn risk in North zone." },
+  { domain: "Regulatory", prompt: "What's in our regulatory pipeline?" },
 ];
 
 const processingStatuses = [

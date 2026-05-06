@@ -199,6 +199,14 @@ def _title_for_result(question: str, result: QueryResult) -> str:
         if any("material_category" in row for row in result.rows):
             return "Procurement savings by category"
         return "Procurement savings summary"
+    if "distributor" in lower or any("distributor_id" in row for row in result.rows):
+        return "Distributor risk ranking"
+    if "field force" in lower or any("visit_outcome" in row for row in result.rows):
+        return "Field force activity by outcome"
+    if "regulatory" in lower or "pipeline" in lower or any("pipeline_value_cr" in row for row in result.rows):
+        return "Regulatory pipeline by market"
+    if "ebitda" in lower and ("variance" in lower or "miss" in lower or any("ebitda_variance_cr" in row for row in result.rows)):
+        return "EBITDA variance by business unit"
     if "revenue" in lower and "ebitda" in lower:
         return "Revenue and EBITDA analysis"
     if "revenue" in lower or "sales" in lower:
@@ -252,6 +260,46 @@ def _narrative_from_rows(
                 parts.append(f"Average premium versus market is {_format_value(premium_key, avg_premium)}.")
             return " ".join(parts)
 
+    if any("distributor_id" in row for row in rows):
+        dso_key = next((column for column in numeric_columns if "dso" in column.lower()), None)
+        revenue_key = next((column for column in numeric_columns if "revenue" in column.lower()), None)
+        sorted_rows = sorted(rows, key=lambda row: float(row.get(dso_key or revenue_key or numeric_columns[0]) or 0), reverse=True)
+        leader = sorted_rows[0]
+        parts = [f"Distributor risk analysis returned {len(rows)} distributor rows."]
+        if dso_key:
+            parts.append(f"{leader.get('distributor_id')} has the highest DSO signal at {_format_value(dso_key, float(leader.get(dso_key) or 0))}.")
+        if revenue_key:
+            total = sum(float(row.get(revenue_key) or 0) for row in rows)
+            parts.append(f"Paid revenue in scope is {_format_value(revenue_key, total)}.")
+        return " ".join(parts)
+
+    if any("visit_outcome" in row for row in rows):
+        visits_key = next((column for column in numeric_columns if "visit" in column.lower()), None)
+        total = sum(float(row.get(visits_key) or 0) for row in rows) if visits_key else len(rows)
+        leader = max(rows, key=lambda row: float(row.get(visits_key or numeric_columns[0]) or 0))
+        return (
+            f"Field force activity returned {len(rows)} outcome rows, with {_format_value(visits_key or numeric_columns[0], total)} total visits. "
+            f"The largest outcome is {leader.get('visit_outcome')}."
+        )
+
+    if any("pipeline_value_cr" in row for row in rows):
+        value_key = "pipeline_value_cr"
+        total = sum(float(row.get(value_key) or 0) for row in rows)
+        leader = max(rows, key=lambda row: float(row.get(value_key) or 0))
+        return (
+            f"Regulatory pipeline value in scope is {_format_value(value_key, total)} across {len(rows)} country-status rows. "
+            f"The largest market/status pocket is {leader.get('country')} {leader.get('status')}."
+        )
+
+    if any("ebitda_variance_cr" in row for row in rows):
+        variance_key = "ebitda_variance_cr"
+        total = sum(float(row.get(variance_key) or 0) for row in rows)
+        worst = min(rows, key=lambda row: float(row.get(variance_key) or 0))
+        return (
+            f"EBITDA variance totals {_format_value(variance_key, total)} across the returned business units. "
+            f"{worst.get('business_unit')} is the largest drag at {_format_value(variance_key, float(worst.get(variance_key) or 0))}."
+        )
+
     first = rows[0]
     last = rows[-1]
     label = _row_label(first, period_columns)
@@ -279,4 +327,6 @@ def _format_value(column: str, value: float) -> str:
         return f"{value:.1f}%"
     if column.endswith("_cr"):
         return f"₹{value:.1f} Cr"
+    if column.endswith("_days"):
+        return f"{value:.1f} days"
     return f"{value:,.1f}"

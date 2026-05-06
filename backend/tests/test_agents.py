@@ -101,7 +101,7 @@ def test_planner_procurement_fallback_for_ytd(monkeypatch: pytest.MonkeyPatch):
     result = run_plan("Show me procurement savings vs target by category. Time period: FY26 year-to-date")
 
     analysis = result.analyses[0]
-    assert analysis.tables_needed == ["procurement_enriched"]
+    assert analysis.tables_needed == ["fact_procurement"]
     assert analysis.filters == {"fiscal_year": "FY26"}
     assert "savings_vs_market_cr" in " ".join(analysis.measures)
 
@@ -114,7 +114,7 @@ def test_planner_falls_back_on_provider_timeout(monkeypatch: pytest.MonkeyPatch)
 
     result = run_plan("Show me procurement savings vs target by category. Time period: FY26 year-to-date")
 
-    assert result.analyses[0].tables_needed == ["procurement_enriched"]
+    assert result.analyses[0].tables_needed == ["fact_procurement"]
 
 
 def test_executor_falls_back_on_azure_content_filter(monkeypatch: pytest.MonkeyPatch):

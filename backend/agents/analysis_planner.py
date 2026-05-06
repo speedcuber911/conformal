@@ -53,6 +53,10 @@ def _local_plan(interpreted_question: str) -> Plan:
     asks_last_two_quarters = "last two quarter" in lower or "last 2 quarter" in lower
     asks_procurement = any(token in lower for token in ("procurement", "supplier", "purchase", "po ", "savings", "premium vs market"))
     asks_fy26_ytd = any(token in lower for token in ("fy26 year-to-date", "fy26 ytd", "year-to-date", "ytd"))
+    asks_distributor = any(token in lower for token in ("distributor", "dealer", "paying late", "selling slow", "dso"))
+    asks_field_force = any(token in lower for token in ("field force", "mgo", "visit", "coverage"))
+    asks_regulatory = any(token in lower for token in ("regulatory", "registration", "pipeline", "molecule", "regulator"))
+    asks_ebitda_variance = "ebitda" in lower and any(token in lower for token in ("miss", "variance", "budget", "bridge"))
 
     if asks_procurement:
         filters = {"fiscal_year": "FY26"} if asks_fy26_ytd or "fy26" in lower else {}
@@ -62,7 +66,7 @@ def _local_plan(interpreted_question: str) -> Plan:
                     analysis_id="procurement_1",
                     purpose="Compare procurement value and savings against market price by material category",
                     type="breakdown",
-                    tables_needed=["procurement_enriched"],
+                    tables_needed=["fact_procurement"],
                     filters=filters,
                     measures=[
                         "SUM(total_value_inr) / 10000000 AS spend_cr",
@@ -74,6 +78,88 @@ def _local_plan(interpreted_question: str) -> Plan:
                 )
             ],
             plan_rationale="Used the local procurement planning fallback after the LLM provider rejected or under-specified a safe business prompt.",
+        )
+
+    if asks_ebitda_variance:
+        return Plan(
+            analyses=[
+                Analysis(
+                    analysis_id="ebitda_variance_1",
+                    purpose="Break down Q2 FY26 EBITDA variance against budget by business unit",
+                    type="breakdown",
+                    tables_needed=["fact_finance_pl"],
+                    filters={"fiscal_year": "FY26", "fiscal_quarter": "Q2"},
+                    measures=[
+                        "SUM(ebitda_inr) / 10000000 AS ebitda_cr",
+                        "SUM(ebitda_budget_inr) / 10000000 AS ebitda_budget_cr",
+                        "SUM(ebitda_variance_inr) / 10000000 AS ebitda_variance_cr",
+                    ],
+                    dimensions=["business_unit"],
+                    expected_output_shape="Business-unit rows with actual EBITDA, budget EBITDA, and variance in crores",
+                )
+            ],
+            plan_rationale="Used the local EBITDA variance fallback after the LLM provider rejected or under-specified a safe business prompt.",
+        )
+
+    if asks_distributor:
+        return Plan(
+            analyses=[
+                Analysis(
+                    analysis_id="distributor_risk_1",
+                    purpose="Rank distributors by late-payment exposure and DSO",
+                    type="ranking",
+                    tables_needed=["fact_collections"],
+                    filters={"status": "Paid"},
+                    measures=[
+                        "SUM(invoice_value_inr) / 10000000 AS paid_revenue_cr",
+                        "AVG(actual_payment_days) AS avg_dso_days",
+                        "SUM(days_overdue) AS overdue_days",
+                    ],
+                    dimensions=["distributor_id"],
+                    expected_output_shape="Distributor rows with paid revenue, average DSO, and overdue-day load",
+                )
+            ],
+            plan_rationale="Used the local distributor-risk fallback after the LLM provider rejected or under-specified a safe business prompt.",
+        )
+
+    if asks_field_force:
+        return Plan(
+            analyses=[
+                Analysis(
+                    analysis_id="field_force_1",
+                    purpose="Summarise field-force activity by visit outcome",
+                    type="breakdown",
+                    tables_needed=["fact_field_visits"],
+                    filters={},
+                    measures=[
+                        "COUNT(*) AS visits",
+                        "AVG(duration_min) AS avg_duration_min",
+                    ],
+                    dimensions=["visit_outcome"],
+                    expected_output_shape="Visit-outcome rows with visit counts and average duration",
+                )
+            ],
+            plan_rationale="Used the local field-force fallback after the LLM provider rejected or under-specified a safe business prompt.",
+        )
+
+    if asks_regulatory:
+        return Plan(
+            analyses=[
+                Analysis(
+                    analysis_id="regulatory_pipeline_1",
+                    purpose="Summarise in-flight regulatory pipeline value by country and status",
+                    type="breakdown",
+                    tables_needed=["fact_regulatory_pipeline"],
+                    filters={"status": "Filed|Under Review"},
+                    measures=[
+                        "SUM(expected_revenue_uplift_inr_cr_y1) AS pipeline_value_cr",
+                        "COUNT(*) AS registrations",
+                    ],
+                    dimensions=["country", "status"],
+                    expected_output_shape="Country and status rows with pipeline value and registration count",
+                )
+            ],
+            plan_rationale="Used the local regulatory-pipeline fallback after the LLM provider rejected or under-specified a safe business prompt.",
         )
 
     if asks_revenue or asks_ebitda or asks_last_two_quarters:
