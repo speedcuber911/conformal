@@ -200,14 +200,15 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
     tickMargin: 8,
     minTickGap: 22,
   };
+  const yAxisWidth = compact ? 58 : 76;
 
   if (model.kind === "scatter") {
     return (
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
-        <ScatterChart margin={{ left: 4, right: 14, top: 10, bottom: 8 }}>
+        <ScatterChart margin={{ left: 12, right: 14, top: 10, bottom: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis {...axisProps} type="number" dataKey={model.xKey} name={labelize(model.xKey)} />
-          <YAxis {...axisProps} type="number" dataKey={model.yKeys[0]} name={labelize(model.yKeys[0])} width={42} domain={domainForSeries(model)} />
+          <XAxis {...axisProps} type="number" dataKey={model.xKey} name={labelize(model.xKey)} tickFormatter={formatAxisTick} />
+          <YAxis {...axisProps} type="number" dataKey={model.yKeys[0]} name={labelize(model.yKeys[0])} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
           <ChartTooltip cursor={{ strokeDasharray: "3 3" }} content={<ChartTooltipContent indicator="dot" />} />
           <Scatter data={model.data} dataKey={model.yKeys[0]}>
             {model.data.map((entry, index) => (
@@ -224,7 +225,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
         <BarChart data={model.data} layout="vertical" margin={{ left: 8, right: 20, top: 10, bottom: 4 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-          <XAxis {...axisProps} type="number" domain={domainForSeries(model)} />
+          <XAxis {...axisProps} type="number" tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
           <YAxis {...axisProps} type="category" dataKey={model.xKey} width={70} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
           <Bar dataKey={model.yKeys[0]} radius={[0, 5, 5, 0]} fill={`var(--color-${cssVarKey(model.yKeys[0])})`} />
@@ -236,10 +237,10 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
   if (model.kind === "bar") {
     return (
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
-        <BarChart data={model.data} margin={{ left: 0, right: 12, top: 10, bottom: 4 }}>
+        <BarChart data={model.data} margin={{ left: 12, right: 12, top: 10, bottom: 4 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
-          <YAxis {...axisProps} width={42} domain={domainForSeries(model)} />
+          <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
           {model.yKeys.map((key, index) => (
             <Bar key={key} dataKey={key} radius={[5, 5, 0, 0]} fill={`var(--color-${cssVarKey(key)})`} opacity={index ? 0.72 : 1} />
@@ -252,10 +253,10 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
   if (model.kind === "line") {
     return (
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
-        <LineChart data={model.data} margin={{ left: 0, right: 14, top: 10, bottom: 4 }}>
+        <LineChart data={model.data} margin={{ left: 12, right: 14, top: 10, bottom: 4 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
-          <YAxis {...axisProps} width={42} domain={domainForSeries(model)} />
+          <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
           {model.yKeys.map((key) => (
             <Line key={key} dataKey={key} type="monotone" stroke={`var(--color-${cssVarKey(key)})`} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
@@ -267,10 +268,10 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
 
   return (
     <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
-      <AreaChart data={model.data} margin={{ left: 0, right: 14, top: 10, bottom: 4 }}>
+      <AreaChart data={model.data} margin={{ left: 12, right: 14, top: 10, bottom: 4 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis {...axisProps} dataKey={model.xKey} />
-        <YAxis {...axisProps} width={42} domain={domainForSeries(model)} />
+        <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
         <Area
           dataKey={model.yKeys[0]}
@@ -360,12 +361,14 @@ function inferChartKind(chart: ChartBundle, columns: string[], numericColumns: s
   const text = `${chart.title} ${chart.description ?? ""} ${columns.join(" ")}`.toLowerCase();
   const mark = chart.spec?.mark;
   const markType = typeof mark === "string" ? mark : mark && typeof mark === "object" && "type" in mark ? String(mark.type) : "";
+  const hasTime = columns.some((column) => /(^|_)(date|month|week|quarter|period|year)($|_)/i.test(column));
 
   if (markType.includes("line")) return "line";
   if (markType.includes("area")) return "area";
   if (markType.includes("point") || markType.includes("circle") || text.includes("scatter") || text.includes("digital engagement")) return "scatter";
   if (text.includes("risk") || text.includes("churn") || text.includes("dealer")) return "horizontal-bar";
   if (markType.includes("bar") || text.includes("orders") || text.includes("coverage by") || text.includes("by region")) return "bar";
+  if (hasTime) return "line";
   if (text.includes("trend") || text.includes("weekly") || text.includes("quarter") || text.includes("wave")) return "area";
   if (numericColumns.length >= 2) return "area";
   return "bar";
@@ -469,6 +472,20 @@ function labelize(key: string) {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatAxisTick(value: string | number) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value);
+  const abs = Math.abs(number);
+  if (abs >= 1_000_000_000) return `${trimNumber(number / 1_000_000_000)}B`;
+  if (abs >= 1_000_000) return `${trimNumber(number / 1_000_000)}M`;
+  if (abs >= 1_000) return `${trimNumber(number / 1_000)}K`;
+  return trimNumber(number);
+}
+
+function trimNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
 }
 
 function inferDomain(chart: ChartBundle, tables: string[]) {

@@ -68,11 +68,13 @@ export async function* agentEvents(message: string, signal?: AbortSignal): Async
 
   yield { type: "tool_start", id: "azure-planner-start", tool: "list_tables", status: "running", label: "Planner agent: selecting dataset and SQL" };
   if (!useAzure) {
-    sql = defaultSqlForRoute(route);
+    const localPlan = localPlanForPrompt(message, route);
+    route = localPlan.route;
+    sql = localPlan.sql;
     planner = {
       route,
       sql,
-      description: `Local planner selected ${ROUTE_LABELS[route]} and generated SQL for the request.`,
+      description: localPlan.description,
     };
     yield {
       type: "tool_end",
@@ -184,7 +186,7 @@ export async function* agentEvents(message: string, signal?: AbortSignal): Async
   let visual: VisualOutput = {};
   let chart = buildChartFromRows({
     id: `agent-${route}-${Date.now()}`,
-    title: titleForRoute(route),
+    title: titleForRequest(message, route, sql),
     description: planner.description ?? checker.description ?? `Generated from ${ROUTE_LABELS[route]}`,
     chartType: inferChartType(rows),
     sql,
@@ -355,11 +357,24 @@ function finalEventFromVisual(visual: VisualOutput): ChatEvent | null {
 
 function fallbackFinalFromRows(route: RouteId, rows: Record<string, unknown>[]): ChatEvent {
   const columns = Object.keys(rows[0] ?? {});
+  const primaryNumeric = columns.find((column) => rows.some((row) => isNumeric(row[column])));
+  const labelColumn = columns.find((column) => column !== primaryNumeric && !rows.some((row) => isNumeric(row[column])));
+  const topRow =
+    primaryNumeric && labelColumn
+      ? [...rows].sort((left, right) => Number(right[primaryNumeric] ?? 0) - Number(left[primaryNumeric] ?? 0))[0]
+      : undefined;
+  const total =
+    primaryNumeric && /revenue|value|spend|sales|invoice|target|actual|ebitda/i.test(primaryNumeric)
+      ? rows.reduce((sum, row) => sum + Number(row[primaryNumeric] ?? 0), 0)
+      : null;
+
   return {
     type: "final",
     text: [
-      `Insight: The agents executed a live SQL query against ${ROUTE_LABELS[route]} and returned ${rows.length} rows for analysis.`,
-      `Chart observations:\n- The rendered chart uses the actual result columns: ${columns.join(", ") || "none"}.\n- Use the trace to inspect the exact SQL that produced this chart.`,
+      topRow && primaryNumeric && labelColumn
+        ? `Insight: ${String(topRow[labelColumn])} is the largest contributor on ${metricLabel(primaryNumeric).toLowerCase()}${total ? `; total is ${formatBusinessNumber(total)} across ${rows.length} rows` : ""}.`
+        : `Insight: The agents executed a live SQL query against ${ROUTE_LABELS[route]} and returned ${rows.length} rows for analysis.`,
+      `Chart observations:\n- The chart uses ${labelColumn ? metricLabel(labelColumn) : metricLabel(columns[0] ?? "the category")} on the x-axis and ${primaryNumeric ? metricLabel(primaryNumeric).toLowerCase() : "the selected metric"} on the y-axis.\n- The result columns are: ${columns.map(metricLabel).join(", ") || "none"}.`,
     ].join("\n\n"),
   };
 }
@@ -401,6 +416,39 @@ function defaultSqlForRoute(route: RouteId) {
   return sqlByRoute[route];
 }
 
+function localPlanForPrompt(prompt: string, route: RouteId) {
+  const lower = prompt.toLowerCase();
+  const asksRevenue = /\b(revenue|sales|topline|turnover)\b/.test(lower);
+  const asksEbitda = /\b(ebitda|profit|margin|pbd?t)\b/.test(lower);
+  const asksLastQuarter = /\b(last|previous|prior)\s+(quarter|qtr)\b/.test(lower);
+  const asksTrend = /\b(time series|trend|monthly|over time|trajectory|run[- ]?rate)\b/.test(lower);
+
+  if (route === "finance" && asksRevenue && asksLastQuarter && !asksTrend) {
+    return {
+      route,
+      sql:
+        asksEbitda
+          ? "SELECT business_unit, SUM(revenue_inr) AS revenue_inr, SUM(ebitda_inr) AS ebitda_inr, AVG(ebitda_pct) AS ebitda_pct FROM fact_finance_pl WHERE fiscal_year = 'FY26' AND fiscal_quarter = 'Q4' GROUP BY business_unit ORDER BY revenue_inr DESC LIMIT 10"
+          : "SELECT business_unit, SUM(revenue_inr) AS revenue_inr FROM fact_finance_pl WHERE fiscal_year = 'FY26' AND fiscal_quarter = 'Q4' GROUP BY business_unit ORDER BY revenue_inr DESC LIMIT 10",
+      description: "Local planner selected FY26 Q4 revenue from fact_finance_pl and grouped it by business unit.",
+    };
+  }
+
+  if (route === "finance" && asksRevenue && !asksEbitda && !asksTrend) {
+    return {
+      route,
+      sql: "SELECT fiscal_year, fiscal_quarter, SUM(revenue_inr) AS revenue_inr FROM fact_finance_pl GROUP BY fiscal_year, fiscal_quarter ORDER BY fiscal_year, fiscal_quarter LIMIT 8",
+      description: "Local planner selected quarterly revenue from fact_finance_pl.",
+    };
+  }
+
+  return {
+    route,
+    sql: defaultSqlForRoute(route),
+    description: `Local planner selected ${ROUTE_LABELS[route]} and generated SQL for the request.`,
+  };
+}
+
 function titleForRoute(route: RouteId) {
   const titles: Record<RouteId, string> = {
     finance: "Financial performance trend",
@@ -413,6 +461,17 @@ function titleForRoute(route: RouteId) {
     sales: "Revenue analysis",
   };
   return titles[route];
+}
+
+function titleForRequest(prompt: string, route: RouteId, sql: string) {
+  const lower = `${prompt} ${sql}`.toLowerCase();
+  if (route === "finance" && lower.includes("revenue_inr") && lower.includes("business_unit") && lower.includes("fiscal_quarter = 'q4'")) {
+    return "Last-quarter revenue by business unit";
+  }
+  if (route === "finance" && lower.includes("revenue_inr") && lower.includes("fiscal_quarter")) {
+    return "Quarterly revenue trend";
+  }
+  return titleForRoute(route);
 }
 
 function buildChartFromRows(input: {
@@ -468,7 +527,36 @@ function isNumeric(value: unknown) {
 }
 
 function isDateLike(value: unknown) {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value);
+  return typeof value === "string" && /^\d{4}-\d{2}(?:-\d{2})?$/.test(value);
+}
+
+function labelize(key: string) {
+  return key
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function metricLabel(key: string) {
+  const normalized = key.toLowerCase().replace(/^(sum|avg|min|max|count)\s+/, "");
+  if (normalized === "revenue_inr") return "Revenue";
+  if (normalized === "ebitda_inr") return "EBITDA";
+  if (normalized === "total_value_inr") return "Total value";
+  if (normalized === "actual_net_value_inr") return "Actual sales";
+  if (normalized === "target_net_value_inr") return "Target sales";
+  return labelize(key)
+    .replace(/\bInr\b/g, "INR")
+    .replace(/\bPct\b/g, "%")
+    .replace(/\bEbitda\b/g, "EBITDA")
+    .replace(/\bNps\b/g, "NPS");
+}
+
+function formatBusinessNumber(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 10_000_000) return `₹${(value / 10_000_000).toFixed(abs >= 100_000_000 ? 1 : 2)} Cr`;
+  if (abs >= 100_000) return `₹${(value / 100_000).toFixed(1)} L`;
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 1 }).format(value);
 }
 
 async function timed<T>(fn: () => Promise<T>): Promise<TimedResult<T>> {
