@@ -10,7 +10,9 @@ import os
 import pytest
 
 from backend.agents.analysis_planner import plan as run_plan
+from backend.agents import analysis_planner as planner_agent
 from backend.agents import interpreter as interpreter_agent
+from backend.agents import query_executor as executor_agent
 from backend.agents.interpreter import interpret
 from backend.agents.presentation import design
 from backend.agents.query_executor import execute
@@ -50,6 +52,42 @@ def test_interpreter_falls_back_on_azure_content_filter(monkeypatch: pytest.Monk
     assert result.intent_understood is True
     assert result.interpreted_question == "Show me revenue and EBITDA for the last two quarters"
     assert any("Q3 FY26 and Q4 FY26" in assumption for assumption in result.implicit_assumptions)
+
+
+def test_planner_falls_back_on_azure_content_filter(monkeypatch: pytest.MonkeyPatch):
+    def blocked(*_args, **_kwargs):
+        raise RuntimeError("Azure OpenAI 400: content_filter")
+
+    monkeypatch.setattr(planner_agent, "complete_json", blocked)
+
+    result = run_plan("Show me revenue and EBITDA for the last two quarters")
+
+    assert result.analyses[0].tables_needed == ["fact_finance_pl"]
+    assert result.analyses[0].filters["fiscal_quarter"] == "Q3|Q4"
+
+
+def test_executor_falls_back_on_azure_content_filter(monkeypatch: pytest.MonkeyPatch):
+    def blocked(*_args, **_kwargs):
+        raise RuntimeError("Azure OpenAI 400: content_filter")
+
+    monkeypatch.setattr(executor_agent, "complete_json", blocked)
+
+    conn = open_database()
+    analysis = Analysis(
+        analysis_id="finance_1",
+        purpose="Revenue for last two quarters",
+        type="trend",
+        tables_needed=["fact_finance_pl"],
+        filters={"fiscal_year": "FY26", "fiscal_quarter": "Q3|Q4"},
+        measures=["SUM(revenue_inr) / 10000000 AS revenue_cr"],
+        dimensions=["fiscal_year", "fiscal_quarter"],
+        expected_output_shape="Rows by quarter",
+    )
+    result = execute(conn, analysis)
+
+    assert result.success
+    assert result.rows
+    assert "fact_finance_pl" in result.sql
 
 
 @requires_api

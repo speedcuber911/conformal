@@ -78,11 +78,17 @@ def execute(
     last_sql = ""
     for attempt in range(2):  # initial + one retry
         try:
-            raw = complete_json(
-                system,
-                _build_user_message(analysis, prior, last_error),
-                max_tokens=EXECUTOR_MAX_TOKENS,
-            )
+            try:
+                raw = complete_json(
+                    system,
+                    _build_user_message(analysis, prior, last_error),
+                    max_tokens=EXECUTOR_MAX_TOKENS,
+                )
+            except RuntimeError as exc:
+                if _can_use_local_fallback(exc):
+                    raw = _local_sql_for_analysis(analysis)
+                else:
+                    raise
         except json.JSONDecodeError as exc:
             # Model produced unparseable JSON (most often: hit max_tokens
             # mid-string on a complex SQL). One retry already happened inside
@@ -148,3 +154,36 @@ def execute(
         row_count=0,
         notable_observations="",
     )
+
+
+def _can_use_local_fallback(error: Exception) -> bool:
+    message = str(error).lower()
+    return "content_filter" in message or "too many requests" in message or "429" in message
+
+
+def _local_sql_for_analysis(analysis: Analysis) -> dict[str, str]:
+    table = analysis.tables_needed[0] if analysis.tables_needed else "fact_finance_pl"
+    dimensions = [d for d in analysis.dimensions if d]
+    measures = [m for m in analysis.measures if m]
+    select_parts = dimensions + (measures or ["COUNT(*) AS row_count"])
+    where_parts = []
+
+    for column, value in analysis.filters.items():
+        if "|" in value:
+            values = ", ".join(f"'{part.strip()}'" for part in value.split("|") if part.strip())
+            where_parts.append(f"{column} IN ({values})")
+        else:
+            where_parts.append(f"{column} = '{value}'")
+
+    sql = f"SELECT {', '.join(select_parts)} FROM {table}"
+    if where_parts:
+        sql += " WHERE " + " AND ".join(where_parts)
+    if dimensions:
+        sql += " GROUP BY " + ", ".join(dimensions)
+        sql += " ORDER BY " + ", ".join(dimensions)
+    sql += " LIMIT 200"
+
+    return {
+        "sql": sql,
+        "notable_observations": "Generated deterministic SQL because the LLM provider rejected a safe business prompt.",
+    }
