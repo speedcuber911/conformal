@@ -46,7 +46,13 @@ def _local_interpretation(question: str, history: list[Message] | None = None) -
 
 def _can_use_local_fallback(error: Exception) -> bool:
     message = str(error).lower()
-    return "content_filter" in message or "too many requests" in message or "429" in message
+    return (
+        "content_filter" in message
+        or "too many requests" in message
+        or "429" in message
+        or "timed out" in message
+        or "timeout" in message
+    )
 
 
 def _contextual_question(question: str, history: list[Message]) -> str:
@@ -75,7 +81,7 @@ def interpret(question: str, history: list[Message] | None = None) -> Interpreta
     )
     try:
         raw = complete_json(system, user, max_tokens=1024)
-    except RuntimeError as exc:
+    except Exception as exc:
         if _can_use_local_fallback(exc):
             return _local_interpretation(question, history)
         raise

@@ -106,6 +106,17 @@ def test_planner_procurement_fallback_for_ytd(monkeypatch: pytest.MonkeyPatch):
     assert "savings_vs_market_cr" in " ".join(analysis.measures)
 
 
+def test_planner_falls_back_on_provider_timeout(monkeypatch: pytest.MonkeyPatch):
+    def timed_out(*_args, **_kwargs):
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr(planner_agent, "complete_json", timed_out)
+
+    result = run_plan("Show me procurement savings vs target by category. Time period: FY26 year-to-date")
+
+    assert result.analyses[0].tables_needed == ["procurement_enriched"]
+
+
 def test_executor_falls_back_on_azure_content_filter(monkeypatch: pytest.MonkeyPatch):
     def blocked(*_args, **_kwargs):
         raise RuntimeError("Azure OpenAI 400: content_filter")

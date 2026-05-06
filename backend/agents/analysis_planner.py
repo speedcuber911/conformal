@@ -27,7 +27,7 @@ def plan(interpreted_question: str, implicit_assumptions: list[str] | None = Non
     )
     try:
         raw = complete_json(system, user, max_tokens=2048)
-    except RuntimeError as exc:
+    except Exception as exc:
         if _can_use_local_fallback(exc):
             return _local_plan(interpreted_question)
         raise
@@ -36,7 +36,13 @@ def plan(interpreted_question: str, implicit_assumptions: list[str] | None = Non
 
 def _can_use_local_fallback(error: Exception) -> bool:
     message = str(error).lower()
-    return "content_filter" in message or "too many requests" in message or "429" in message
+    return (
+        "content_filter" in message
+        or "too many requests" in message
+        or "429" in message
+        or "timed out" in message
+        or "timeout" in message
+    )
 
 
 def _local_plan(interpreted_question: str) -> Plan:

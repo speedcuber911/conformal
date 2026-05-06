@@ -84,7 +84,7 @@ def execute(
                     _build_user_message(analysis, prior, last_error),
                     max_tokens=EXECUTOR_MAX_TOKENS,
                 )
-            except RuntimeError as exc:
+            except Exception as exc:
                 if _can_use_local_fallback(exc):
                     raw = _local_sql_for_analysis(analysis)
                 else:
@@ -158,7 +158,13 @@ def execute(
 
 def _can_use_local_fallback(error: Exception) -> bool:
     message = str(error).lower()
-    return "content_filter" in message or "too many requests" in message or "429" in message
+    return (
+        "content_filter" in message
+        or "too many requests" in message
+        or "429" in message
+        or "timed out" in message
+        or "timeout" in message
+    )
 
 
 def _local_sql_for_analysis(analysis: Analysis) -> dict[str, str]:
