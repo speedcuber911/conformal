@@ -46,11 +46,11 @@ def _local_plan(interpreted_question: str) -> Plan:
     asks_time = any(token in lower for token in ("time series", "trend", "month", "monthly", "over time"))
     asks_last_two_quarters = "last two quarter" in lower or "last 2 quarter" in lower
 
-    if asks_revenue or asks_ebitda:
+    if asks_revenue or asks_ebitda or asks_last_two_quarters:
         measures = []
-        if asks_revenue:
+        if asks_revenue or asks_last_two_quarters:
             measures.append("SUM(revenue_inr) / 10000000 AS revenue_cr")
-        if asks_ebitda:
+        if asks_ebitda or asks_last_two_quarters:
             measures.append("SUM(ebitda_inr) / 10000000 AS ebitda_cr")
             measures.append("CASE WHEN SUM(revenue_inr) = 0 THEN NULL ELSE SUM(ebitda_inr) / SUM(revenue_inr) * 100 END AS ebitda_margin_pct")
 

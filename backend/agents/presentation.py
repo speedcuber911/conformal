@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import Callable
 
-from backend.contracts import Plan, Presentation, QueryResult
+from backend.contracts import Plan, Presentation, PresentationElement, QueryResult
 from backend.llm import complete_text, complete_text_stream
 from backend.prompts import load_doc, load_prompt, render
 
@@ -80,8 +80,13 @@ def design(
     template = load_prompt("presenter")
     system = render(template, chart_rules=load_doc("CHART_RULES.yaml"))
     user = _build_user_message(interpreted_question, plan, results)
-    raw = complete_text(system, user, max_tokens=4096)
-    return _parse_presenter_output(raw)
+    try:
+        raw = complete_text(system, user, max_tokens=4096)
+        return _parse_presenter_output(raw)
+    except Exception as exc:
+        if _can_use_local_fallback(exc):
+            return _local_presentation(interpreted_question, results)
+        raise
 
 
 def design_streaming(
@@ -127,8 +132,117 @@ def design_streaming(
             on_token(state["buffer"][state["emitted"] : safe_end])
             state["emitted"] = safe_end
 
-    full = complete_text_stream(system, user, handle, max_tokens=4096)
+    try:
+        full = complete_text_stream(system, user, handle, max_tokens=4096)
+    except Exception as exc:
+        if _can_use_local_fallback(exc):
+            presentation = _local_presentation(interpreted_question, results)
+            on_token(presentation.narrative)
+            return presentation
+        raise
     # Defensive: ensure the buffer matches the streamed total.
     if not state["buffer"]:
         state["buffer"] = full
     return _parse_presenter_output(state["buffer"])
+
+
+def _can_use_local_fallback(error: Exception) -> bool:
+    message = str(error).lower()
+    return (
+        "content_filter" in message
+        or "too many requests" in message
+        or "429" in message
+        or "timed out" in message
+        or "timeout" in message
+    )
+
+
+def _local_presentation(interpreted_question: str, results: list[QueryResult]) -> Presentation:
+    successful = next((result for result in results if result.success and result.rows), None)
+    if not successful:
+        return Presentation(
+            narrative="I could not produce a usable result from the executed analyses.",
+            layout=[],
+            key_observations=["No successful analysis rows were available for presentation."],
+        )
+
+    rows = successful.rows
+    columns = successful.columns
+    numeric_columns = [
+        column for column in columns if any(isinstance(row.get(column), (int, float)) and not isinstance(row.get(column), bool) for row in rows)
+    ]
+    period_columns = [column for column in columns if column in {"month", "fiscal_quarter", "fiscal_year"}]
+    title = _title_for_result(interpreted_question, successful)
+    chart_type = "line_chart" if "month" in columns else "table" if len(rows) <= 4 else "bar_chart"
+
+    narrative = _narrative_from_rows(rows, numeric_columns, period_columns)
+    element = PresentationElement(
+        type=chart_type,
+        analysis_id=successful.analysis_id,
+        title=title,
+        subtitle="Generated from executed workbook data.",
+        chart_options=_chart_options(chart_type, columns, numeric_columns),
+        table_options={"max_rows": min(len(rows), 20)} if chart_type == "table" else None,
+    )
+    return Presentation(
+        narrative=narrative,
+        layout=[element],
+        key_observations=[narrative],
+    )
+
+
+def _title_for_result(question: str, result: QueryResult) -> str:
+    lower = question.lower()
+    if "revenue" in lower and "ebitda" in lower:
+        return "Revenue and EBITDA analysis"
+    if "revenue" in lower or "sales" in lower:
+        return "Revenue analysis"
+    return result.analysis_id.replace("_", " ").title()
+
+
+def _chart_options(chart_type: str, columns: list[str], numeric_columns: list[str]) -> dict[str, str] | None:
+    if chart_type not in {"line_chart", "bar_chart"}:
+        return None
+    x_field = "month" if "month" in columns else next((column for column in columns if column not in numeric_columns), columns[0] if columns else "")
+    y_field = next((column for column in numeric_columns if "revenue" in column.lower()), numeric_columns[0] if numeric_columns else "")
+    return {"x_field": x_field, "y_field": y_field}
+
+
+def _narrative_from_rows(
+    rows: list[dict],
+    numeric_columns: list[str],
+    period_columns: list[str],
+) -> str:
+    if not rows:
+        return "The analysis ran, but it returned no rows."
+    if not numeric_columns:
+        return f"The analysis returned {len(rows)} rows from the workbook."
+
+    first = rows[0]
+    last = rows[-1]
+    label = _row_label(first, period_columns)
+    latest_label = _row_label(last, period_columns)
+    parts = []
+    for column in numeric_columns[:3]:
+        first_value = first.get(column)
+        last_value = last.get(column)
+        if isinstance(first_value, (int, float)) and isinstance(last_value, (int, float)):
+            parts.append(f"{_labelize(column)} moved from {_format_value(column, first_value)} in {label} to {_format_value(column, last_value)} in {latest_label}.")
+    return " ".join(parts) or f"The analysis returned {len(rows)} rows from the workbook."
+
+
+def _row_label(row: dict, period_columns: list[str]) -> str:
+    values = [str(row.get(column)) for column in period_columns if row.get(column) is not None]
+    return " ".join(values) if values else "the first period"
+
+
+def _labelize(value: str) -> str:
+    return value.replace("_", " ").replace("pct", "%").replace("cr", "Cr").title().replace("Ebitda", "EBITDA")
+
+
+def _format_value(column: str, value: float) -> str:
+    if column.endswith("_pct"):
+        return f"{value:.1f}%"
+    if column.endswith("_cr"):
+        return f"₹{value:.1f} Cr"
+    return f"{value:,.1f}"

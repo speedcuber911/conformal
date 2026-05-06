@@ -12,6 +12,7 @@ import pytest
 from backend.agents.analysis_planner import plan as run_plan
 from backend.agents import analysis_planner as planner_agent
 from backend.agents import interpreter as interpreter_agent
+from backend.agents import presentation as presentation_agent
 from backend.agents import query_executor as executor_agent
 from backend.agents.interpreter import interpret
 from backend.agents.presentation import design
@@ -88,6 +89,46 @@ def test_executor_falls_back_on_azure_content_filter(monkeypatch: pytest.MonkeyP
     assert result.success
     assert result.rows
     assert "fact_finance_pl" in result.sql
+
+
+def test_presentation_falls_back_on_timeout(monkeypatch: pytest.MonkeyPatch):
+    def timed_out(*_args, **_kwargs):
+        raise TimeoutError("The read operation timed out")
+
+    monkeypatch.setattr(presentation_agent, "complete_text", timed_out)
+
+    plan_obj = Plan(
+        analyses=[
+            Analysis(
+                analysis_id="finance_1",
+                purpose="Revenue and EBITDA trend",
+                type="trend",
+                tables_needed=["fact_finance_pl"],
+                filters={},
+                measures=[],
+                dimensions=["month"],
+                expected_output_shape="Monthly rows",
+            )
+        ],
+        plan_rationale="test",
+    )
+    result = QueryResult(
+        analysis_id="finance_1",
+        sql="SELECT month, revenue_cr, ebitda_cr FROM fact_finance_pl",
+        success=True,
+        rows=[
+            {"month": "2026-02", "revenue_cr": 100.0, "ebitda_cr": 8.0},
+            {"month": "2026-03", "revenue_cr": 110.0, "ebitda_cr": 9.0},
+        ],
+        columns=["month", "revenue_cr", "ebitda_cr"],
+        row_count=2,
+    )
+
+    presentation = design("Show me revenue and EBITDA time series", plan_obj, [result])
+
+    assert presentation.narrative
+    assert presentation.layout[0].type == "line_chart"
+    assert presentation.layout[0].analysis_id == "finance_1"
 
 
 @requires_api
