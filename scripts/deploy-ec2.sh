@@ -14,15 +14,17 @@ if [ -f /etc/leap.env ]; then
   set +a
 fi
 
-docker compose -f "$COMPOSE_FILE" build app
-docker compose -f "$COMPOSE_FILE" up -d app
+docker compose -f "$COMPOSE_FILE" build app backend
+docker compose -f "$COMPOSE_FILE" up -d backend app
 
 for attempt in $(seq 1 20); do
-  if docker exec cut-nginx wget -qO- http://partner-dcmshriram:3000/api/health >/dev/null; then
+  if docker exec cut-nginx wget -qO- http://partner-dcmshriram:3000/api/health >/dev/null \
+    && docker exec partner-dcmshriram wget -qO- http://backend:8000/health >/dev/null; then
     break
   fi
 
   if [ "$attempt" -eq 20 ]; then
+    docker logs --tail=80 partner-dcmshriram-backend
     docker logs --tail=80 partner-dcmshriram
     exit 1
   fi
