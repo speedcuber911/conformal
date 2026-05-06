@@ -16,7 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import { getDuckDbStore, rowsToCsv, tablesForSql } from "./duckdb-client";
 import type { ChartBundle } from "./types";
@@ -251,16 +251,37 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
   }
 
   if (model.kind === "line") {
+    const dualAxis = shouldUseDualAxis(model);
     return (
       <ChartContainer config={model.config} className={cn("shadcn-chart aspect-auto w-full", heightClass)}>
-        <LineChart data={model.data} margin={{ left: 12, right: 14, top: 10, bottom: 4 }}>
+        <LineChart data={model.data} margin={{ left: 12, right: dualAxis ? 22 : 14, top: 10, bottom: 4 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
-          <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
+          <YAxis {...axisProps} yAxisId="left" width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForKey(model, model.yKeys[0])} />
+          {dualAxis ? (
+            <YAxis
+              {...axisProps}
+              yAxisId="right"
+              orientation="right"
+              width={yAxisWidth}
+              tickFormatter={formatAxisTick}
+              domain={domainForKey(model, model.yKeys[1])}
+            />
+          ) : null}
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-          {model.yKeys.map((key) => (
-            <Line key={key} dataKey={key} type="monotone" stroke={`var(--color-${cssVarKey(key)})`} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+          {model.yKeys.map((key, index) => (
+            <Line
+              key={key}
+              yAxisId={dualAxis && index === 1 ? "right" : "left"}
+              dataKey={key}
+              type="monotone"
+              stroke={`var(--color-${cssVarKey(key)})`}
+              strokeWidth={2.5}
+              dot={{ r: 3 }}
+              activeDot={{ r: 5 }}
+            />
           ))}
+          {model.yKeys.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
         </LineChart>
       </ChartContainer>
     );
@@ -285,6 +306,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
         {model.yKeys.slice(1).map((key) => (
           <Line key={key} dataKey={key} type="monotone" stroke={`var(--color-${cssVarKey(key)})`} strokeWidth={2.25} dot={false} activeDot={{ r: 5 }} />
         ))}
+        {model.yKeys.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
       </AreaChart>
     </ChartContainer>
   );
@@ -444,6 +466,15 @@ function buildConfig(keys: string[], labels = keys): ChartConfig {
 
 function domainForSeries(model: ChartModel): [number | "auto", number | "auto"] {
   const values = model.data.flatMap((row) => model.yKeys.map((key) => Number(row[key])).filter(Number.isFinite));
+  return domainForValues(values);
+}
+
+function domainForKey(model: ChartModel, key: string): [number | "auto", number | "auto"] {
+  const values = model.data.map((row) => Number(row[key])).filter(Number.isFinite);
+  return domainForValues(values);
+}
+
+function domainForValues(values: number[]): [number | "auto", number | "auto"] {
   if (!values.length) return ["auto", "auto"];
 
   const min = Math.min(...values);
@@ -452,6 +483,16 @@ function domainForSeries(model: ChartModel): [number | "auto", number | "auto"] 
 
   const padding = Math.max((max - min) * 0.12, 2);
   return [Math.floor(min - padding), niceCeiling(max + padding)];
+}
+
+function shouldUseDualAxis(model: ChartModel) {
+  if (model.yKeys.length < 2) return false;
+  const maxima = model.yKeys
+    .slice(0, 2)
+    .map((key) => Math.max(...model.data.map((row) => Math.abs(Number(row[key]))).filter(Number.isFinite)));
+  const [first, second] = maxima;
+  if (!first || !second) return false;
+  return Math.max(first, second) / Math.min(first, second) >= 8;
 }
 
 function niceCeiling(value: number) {
@@ -467,7 +508,25 @@ function cssVarKey(key: string) {
 }
 
 function labelize(key: string) {
-  return key
+  const normalized = key.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  const knownLabels: Record<string, string> = {
+    revenue: "Revenue",
+    "revenue inr": "Revenue",
+    ebitda: "EBITDA",
+    "ebitda inr": "EBITDA",
+    "ebitda pct": "EBITDA %",
+    "sell in value inr": "Sell-in value",
+    "sell out value inr": "Sell-out value",
+    "net sales value inr": "Net sales value",
+    "invoice value inr": "Invoice value",
+    "total value inr": "Total value",
+    "premium vs market pct": "Premium vs market",
+    "collection amount inr": "Collection amount",
+    "overdue amount inr": "Overdue amount",
+    "inventory value inr": "Inventory value",
+  };
+
+  return (knownLabels[normalized] ?? key)
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
