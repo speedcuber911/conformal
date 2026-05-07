@@ -6,7 +6,19 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { DuckDBStore } from "@/lib/duckdb-store";
-import { applyChatEvent, AssistantMarkdown, buildPreparedTrustResponse, ChatPanel, consumeNdjson, processingInsightFromTrace, starters, useProcessingStatus } from "./ChatPanel";
+import {
+  applyChatEvent,
+  AssistantMarkdown,
+  buildPreparedTrustResponse,
+  businessStarters,
+  ChatPanel,
+  consumeNdjson,
+  processingInsightFromTrace,
+  questionBankBuildSteps,
+  starters,
+  useProcessingStatus,
+  useQuestionBankIntro,
+} from "./ChatPanel";
 import { LiveChart } from "./LiveChart";
 import type { ChartBundle, ChatMessage } from "./types";
 
@@ -253,6 +265,8 @@ function MobileHeader({ live }: { live: boolean }) {
 }
 
 function MobileHome({ onAsk }: { onAsk: (prompt: string) => void }) {
+  const intro = useQuestionBankIntro(3);
+
   return (
     <div className="mobile-home" aria-label="Project Leap home">
       <section className="mobile-home-hero">
@@ -274,14 +288,26 @@ function MobileHome({ onAsk }: { onAsk: (prompt: string) => void }) {
         </article>
       </section>
 
+      <section className={cn("mobile-home-build", intro.complete && "mobile-home-build-complete")} aria-live="polite" aria-label="Demo question generation status">
+        <strong>{intro.complete ? "Demo questions ready" : "Building demo questions"}</strong>
+        <span>{intro.complete ? "Source trails and chart rationale are locked." : questionBankBuildSteps[intro.currentStep]}</span>
+      </section>
+
       <section className="mobile-home-list" aria-label="Demo questions">
         <h2>Demo questions</h2>
-        {starters.slice(0, 3).map((starter) => (
-          <button type="button" key={starter.prompt} onClick={() => onAsk(starter.prompt)}>
-            <strong>{starter.label}</strong>
-            <span>{starter.prompt}</span>
-          </button>
-        ))}
+        {businessStarters.slice(0, 3).map((starter, index) =>
+          index < intro.revealedCount ? (
+            <button type="button" key={starter.prompt} onClick={() => onAsk(starter.prompt)}>
+              <strong>{starter.label}</strong>
+              <span>{starter.prompt}</span>
+            </button>
+          ) : (
+            <div className="mobile-question-skeleton" key={`mobile-skeleton-${starter.prompt}`} aria-hidden="true">
+              <strong />
+              <span />
+            </div>
+          ),
+        )}
       </section>
     </div>
   );

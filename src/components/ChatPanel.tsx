@@ -138,6 +138,13 @@ export const trustStarters: StarterPrompt[] = [
 export const starters = [...businessStarters, ...trustStarters];
 const followUpStarters = [businessStarters[2], businessStarters[4], businessStarters[5], ...trustStarters];
 
+export const questionBankBuildSteps = [
+  "Reading leadership priorities and recent demo searches.",
+  "Scoring questions by business relevance and evidence depth.",
+  "Matching cards to verified finance, channel, procurement, and field-force routes.",
+  "Locking source trails, assumptions, chart rationale, and limits.",
+];
+
 const processingStatuses = [
   "Thinking through the question...",
   "Getting data from database...",
@@ -162,6 +169,33 @@ export function useProcessingStatus(active: boolean) {
   }, [active]);
 
   return active ? processingStatuses[index] : processingStatuses[0];
+}
+
+export function useQuestionBankIntro(totalCards: number) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [revealedCount, setRevealedCount] = useState(0);
+
+  useEffect(() => {
+    const timers: number[] = [];
+
+    questionBankBuildSteps.forEach((_, index) => {
+      timers.push(window.setTimeout(() => setCurrentStep(index), 320 + index * 560));
+    });
+
+    for (let index = 0; index <= totalCards; index += 1) {
+      timers.push(window.setTimeout(() => setRevealedCount(index), 760 + index * 145));
+    }
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [totalCards]);
+
+  return {
+    currentStep,
+    revealedCount,
+    complete: revealedCount >= totalCards && currentStep >= questionBankBuildSteps.length - 1,
+  };
 }
 
 export function processingInsightFromTrace(trace: TraceEvent[] | undefined, fallback: string) {
@@ -717,6 +751,8 @@ function renderMarkdownInline(text: string) {
 }
 
 function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void }) {
+  const intro = useQuestionBankIntro(businessStarters.length);
+
   return (
     <div className="welcome-state">
       <div className="welcome-copy">
@@ -727,21 +763,54 @@ function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void
         <p>Fire the business probes first, then use the trust probes as follow-ups to show source, assumptions, chart rationale, and limits.</p>
       </div>
 
+      <QuestionBankBuildLog currentStep={intro.currentStep} complete={intro.complete} />
+
       <div className="query-bank">
-        <PromptSection title="P0 business questions" count={businessStarters.length} starters={businessStarters} onPickPrompt={onPickPrompt} />
+        <PromptSection
+          title="P0 business questions"
+          count={businessStarters.length}
+          revealedCount={intro.revealedCount}
+          starters={businessStarters}
+          onPickPrompt={onPickPrompt}
+        />
       </div>
     </div>
+  );
+}
+
+function QuestionBankBuildLog({ currentStep, complete }: { currentStep: number; complete: boolean }) {
+  return (
+    <section className={cn("question-bank-build", complete && "question-bank-build-complete")} aria-live="polite" aria-label="Question bank generation status">
+      <div className="build-pulse" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+      <div className="build-copy">
+        <strong>{complete ? "Question bank ready" : "Building question bank"}</strong>
+        <p>{complete ? "Source trails, assumptions, chart rationale, and limits are locked." : questionBankBuildSteps[currentStep]}</p>
+      </div>
+      <ol>
+        {questionBankBuildSteps.map((step, index) => (
+          <li key={step} className={cn(index < currentStep && "done", index === currentStep && "active", complete && "done")}>
+            <span />
+            {step}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
 function PromptSection({
   title,
   count,
+  revealedCount,
   starters,
   onPickPrompt,
 }: {
   title: string;
   count: number;
+  revealedCount: number;
   starters: StarterPrompt[];
   onPickPrompt: (prompt: string) => void;
 }) {
@@ -749,20 +818,36 @@ function PromptSection({
     <section className="query-bank-section" aria-label={title}>
       <div className="query-bank-heading">
         <strong>{title}</strong>
-        <span>{count} cards</span>
+        <span>{revealedCount >= count ? `${count} cards` : `Creating ${revealedCount}/${count}`}</span>
       </div>
       <div className="hero-query-grid">
-        {starters.map((starter) => (
-          <button type="button" key={starter.prompt} onClick={() => onPickPrompt(starter.prompt)}>
-            <span className="query-card-kicker">
-              <em>{starter.domain}</em>
-              <b>{starter.label}</b>
-            </span>
-            <strong>{starter.prompt}</strong>
-            <small>{starter.detail}</small>
-            {starter.anchor ? <i>{starter.anchor}</i> : null}
-          </button>
-        ))}
+        {starters.map((starter, index) =>
+          index < revealedCount ? (
+            <motion.button
+              type="button"
+              key={starter.prompt}
+              initial={{ opacity: 0, y: 14, filter: "blur(5px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ duration: 0.34, ease: [0.19, 1, 0.22, 1] }}
+              onClick={() => onPickPrompt(starter.prompt)}
+            >
+              <span className="query-card-kicker">
+                <em>{starter.domain}</em>
+                <b>{starter.label}</b>
+              </span>
+              <strong>{starter.prompt}</strong>
+              <small>{starter.detail}</small>
+              {starter.anchor ? <i>{starter.anchor}</i> : null}
+            </motion.button>
+          ) : (
+            <div className="query-card-skeleton" key={`skeleton-${starter.prompt}`} aria-hidden="true">
+              <span />
+              <strong />
+              <small />
+              <i />
+            </div>
+          ),
+        )}
       </div>
     </section>
   );
