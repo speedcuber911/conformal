@@ -779,24 +779,17 @@ function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void
 }
 
 function QuestionBankBuildLog({ currentStep, complete }: { currentStep: number; complete: boolean }) {
+  const progress = complete ? 100 : Math.min(92, Math.round(((currentStep + 1) / questionBankBuildSteps.length) * 100));
+
   return (
     <section className={cn("question-bank-build", complete && "question-bank-build-complete")} aria-live="polite" aria-label="Question bank generation status">
-      <div className="build-pulse" aria-hidden="true">
-        <span />
-        <span />
-      </div>
       <div className="build-copy">
         <strong>{complete ? "Question bank ready" : "Building question bank"}</strong>
+        <div className="build-progress" aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </div>
         <p>{complete ? "Source trails, assumptions, chart rationale, and limits are locked." : questionBankBuildSteps[currentStep]}</p>
       </div>
-      <ol>
-        {questionBankBuildSteps.map((step, index) => (
-          <li key={step} className={cn(index < currentStep && "done", index === currentStep && "active", complete && "done")}>
-            <span />
-            {step}
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }
