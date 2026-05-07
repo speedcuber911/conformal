@@ -195,27 +195,30 @@ export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {
       <section className="chat-pane">
         {hasConversation ? (
           <div className="message-list">
-            {messages.map((message) => (
-              <motion.article
-                layout
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn("message", message.role === "user" && "message-user")}
-                key={message.id}
-              >
-                <div className="message-body">
-                  {message.role === "user" ? <p className="user-question">{message.content}</p> : null}
-                  {message.trace?.length ? <TraceSummary trace={message.trace} /> : null}
-                  {message.role === "assistant" && message.trace?.length ? <PlanProgress trace={message.trace} /> : null}
-                  {message.role === "assistant" ? (
-                    <AssistantMarkdown
-                      className={cn("answer-copy", !message.content && isSending && "answer-copy-loading")}
-                      text={message.content || (isSending ? processingInsightFromTrace(message.trace, processingStatus) : "")}
-                    />
-                  ) : null}
-                </div>
-              </motion.article>
-            ))}
+            {messages.map((message, messageIndex) => {
+              const activeAssistant = isSending && message.role === "assistant" && messageIndex === messages.length - 1;
+              return (
+                <motion.article
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={cn("message", message.role === "user" && "message-user")}
+                  key={message.id}
+                >
+                  <div className="message-body">
+                    {message.role === "user" ? <p className="user-question">{message.content}</p> : null}
+                    {message.trace?.length ? <TraceSummary trace={message.trace} active={activeAssistant} /> : null}
+                    {message.role === "assistant" && activeAssistant && message.trace?.length ? <PlanProgress trace={message.trace} /> : null}
+                    {message.role === "assistant" ? (
+                      <AssistantMarkdown
+                        className={cn("answer-copy", !message.content && activeAssistant && "answer-copy-loading")}
+                        text={message.content || (activeAssistant ? processingInsightFromTrace(message.trace, processingStatus) : "")}
+                      />
+                    ) : null}
+                  </div>
+                </motion.article>
+              );
+            })}
           </div>
         ) : (
           <WelcomeState onPickPrompt={(prompt) => void submitPrompt(undefined, prompt)} />
@@ -311,7 +314,7 @@ type AnalysisPlan = {
 };
 
 type AnalysisProgress = {
-  state: "running" | "complete" | "failed";
+  state: "queued" | "running" | "complete" | "failed";
   rowCount?: number;
   notableObservations?: string;
   error?: string;
@@ -432,22 +435,30 @@ function PlanProgress({ trace }: { trace: TraceEvent[] }) {
   return (
     <div className="plan-display" aria-label="Analysis plan">
       <div className="plan-header">
-        <strong>
-          Plan ({plan.analyses.length} {plan.analyses.length === 1 ? "analysis" : "analyses"})
-        </strong>
-        {plan.plan_rationale ? <span className="muted"> - {plan.plan_rationale}</span> : null}
+        <strong>Thought-through artifacts</strong>
+        <span>
+          {plan.analyses.length} {plan.analyses.length === 1 ? "lens" : "lenses"}
+        </span>
+        {plan.plan_rationale ? <p>{compactRationale(plan.plan_rationale)}</p> : null}
       </div>
       <ul className="plan-list">
-        {plan.analyses.map((analysis) => {
-          const status = progress.get(analysis.analysis_id) ?? { state: "running" as const };
+        {plan.analyses.map((analysis, index) => {
+          const status = progress.get(analysis.analysis_id) ?? { state: "queued" as const };
+          const statusLabel = analysisStatusLabel(status);
           return (
             <li key={analysis.analysis_id} className={cn("plan-item", `plan-${status.state}`)}>
-              <span className="plan-icon">{status.state === "complete" ? "✓" : status.state === "failed" ? "!" : ""}</span>
-              <span className="plan-id">{analysis.analysis_id}</span>
-              <span className="plan-type">{analysis.type}</span>
-              <span className="plan-purpose">{analysis.purpose}</span>
-              {status.notableObservations && status.state === "complete" ? <div className="plan-obs">{status.notableObservations}</div> : null}
-              {status.error ? <div className="plan-err">SQL failed: {status.error}</div> : null}
+              <span className="plan-icon" aria-hidden="true">
+                {status.state === "complete" ? "✓" : status.state === "failed" ? "!" : status.state === "running" ? "" : index + 1}
+              </span>
+              <div className="plan-copy">
+                <div className="plan-line">
+                  <span className="plan-type">{analysis.type}</span>
+                  <span className="plan-state">{statusLabel}</span>
+                </div>
+                <div className="plan-purpose">{analysis.purpose}</div>
+                {status.notableObservations && status.state === "complete" ? <div className="plan-obs">{status.notableObservations}</div> : null}
+                {status.error ? <div className="plan-err">Query failed: {status.error}</div> : null}
+              </div>
             </li>
           );
         })}
@@ -501,29 +512,42 @@ function extractAnalysisProgress(trace: TraceEvent[]) {
   return progress;
 }
 
+function compactRationale(value: string) {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= 170) return text;
+  const sentence = text.match(/^.{90,170}?[.!?](?:\s|$)/)?.[0]?.trim();
+  return sentence ?? `${text.slice(0, 167).trim()}...`;
+}
+
+function analysisStatusLabel(status: AnalysisProgress) {
+  if (status.state === "queued") return "Queued";
+  if (status.state === "running") return "Running query";
+  if (status.state === "failed") return "Needs correction";
+  if (typeof status.rowCount === "number") return `${status.rowCount} rows checked`;
+  return "Evidence ready";
+}
+
 function asPlainRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function TraceSummary({ trace }: { trace: TraceEvent[] }) {
+function TraceSummary({ trace, active }: { trace: TraceEvent[]; active: boolean }) {
   const completedSteps = trace.filter((item) => item.type !== "tool_start" && !item.id.startsWith("sql-"));
-  const total = completedSteps.reduce((sum, item) => {
-    if (typeof item.durationMs === "number") return sum + item.durationMs;
-    const match = item.detail?.match(/(\d+)ms/);
-    return sum + (match ? Number(match[1]) : 0);
-  }, 0);
+  const plan = extractPlan(trace);
+  const progress = extractAnalysisProgress(trace);
+  const analysesDone = Array.from(progress.values()).filter((item) => item.state === "complete" || item.state === "failed").length;
+  const totalAnalyses = plan?.analyses.length ?? 0;
+  const running = active && trace.some((item) => item.status === "running");
+  const status = active ? (running ? "Building thought-through artifacts" : "Preparing analysis") : "Analysis artifacts ready";
+  const count = totalAnalyses ? `${analysesDone}/${totalAnalyses} evidence checks` : `${completedSteps.length || trace.length} steps`;
 
   return (
     <div className="trace-summary">
       <CirclePlus size={15} />
-      {completedSteps.length || trace.length} tool calls · {formatTraceDuration(total || 182)}
+      <span>{status}</span>
+      <small>{count}</small>
     </div>
   );
-}
-
-function formatTraceDuration(ms: number) {
-  if (ms >= 1000) return `${(ms / 1000).toFixed(ms >= 10_000 ? 1 : 2).replace(/\.0$/, "")}s`;
-  return `${ms}ms`;
 }
 
 type KpiCard = {
@@ -809,6 +833,7 @@ export async function consumeNdjson(stream: ReadableStream<Uint8Array>, onEvent:
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let eventIndex = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -821,12 +846,41 @@ export async function consumeNdjson(stream: ReadableStream<Uint8Array>, onEvent:
     for (const line of lines) {
       const text = line.trim();
       if (!text) continue;
-      onEvent(JSON.parse(text));
+      const eventData = JSON.parse(text) as Record<string, unknown>;
+      await waitForReadableProgress(eventData, eventIndex);
+      eventIndex += 1;
+      onEvent(eventData);
     }
   }
 
   const final = buffer.trim();
-  if (final) onEvent(JSON.parse(final));
+  if (final) {
+    const eventData = JSON.parse(final) as Record<string, unknown>;
+    await waitForReadableProgress(eventData, eventIndex);
+    onEvent(eventData);
+  }
+}
+
+function waitForReadableProgress(eventData: Record<string, unknown>, index: number) {
+  const delay = progressDelayMs(eventData, index);
+  if (!delay) return Promise.resolve();
+  return new Promise<void>((resolve) => window.setTimeout(resolve, delay));
+}
+
+function progressDelayMs(eventData: Record<string, unknown>, index: number) {
+  const type = String(eventData.type ?? eventData.event ?? "");
+  const id = String(eventData.id ?? "");
+  const status = String(eventData.status ?? "");
+
+  if (type === "error") return 0;
+  if (index === 0) return 220;
+  if (id === "eceo-plan-end") return 760;
+  if (id.includes("eceo-analysis-") && status === "running") return 520;
+  if (id.includes("eceo-analysis-")) return 620;
+  if (type === "narrative_chunk") return 360;
+  if (id === "eceo-presentation-end") return 520;
+  if (type === "chart") return 150;
+  return 180;
 }
 
 export function applyChatEvent(message: ChatMessage, eventData: Record<string, unknown>): ChatMessage {
