@@ -425,7 +425,47 @@ textarea:focus-visible {
   font-size: 16px;
   font-weight: 430;
   line-height: 1.68;
-  white-space: pre-line;
+}
+
+.answer-copy p,
+.mobile-answer p {
+  margin: 0;
+}
+
+.answer-copy p + p,
+.answer-copy ul + p,
+.answer-copy ol + p,
+.mobile-answer p + p,
+.mobile-answer ul + p,
+.mobile-answer ol + p {
+  margin-top: 18px;
+}
+
+.answer-copy strong,
+.mobile-answer strong {
+  font-weight: 760;
+}
+
+.answer-copy ul,
+.answer-copy ol,
+.mobile-answer ul,
+.mobile-answer ol {
+  margin: 12px 0 0;
+  padding-left: 1.25rem;
+}
+
+.answer-copy li + li,
+.mobile-answer li + li {
+  margin-top: 7px;
+}
+
+.answer-copy code,
+.mobile-answer code {
+  border-radius: 5px;
+  background: rgba(51, 41, 24, 0.08);
+  padding: 0.05em 0.32em;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
 }
 
 .answer-copy-loading,

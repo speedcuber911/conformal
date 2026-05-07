@@ -206,9 +206,10 @@ export function ChatPanel({ live, pinnedIds, onPinChart }: ChatPanelProps) {
                   {message.role === "user" ? <p className="user-question">{message.content}</p> : null}
                   {message.trace?.length ? <TraceSummary trace={message.trace} /> : null}
                   {message.role === "assistant" ? (
-                    <p className={cn("answer-copy", !message.content && isSending && "answer-copy-loading")} aria-live="polite">
-                      {message.content || (isSending ? processingInsightFromTrace(message.trace, processingStatus) : "")}
-                    </p>
+                    <AssistantMarkdown
+                      className={cn("answer-copy", !message.content && isSending && "answer-copy-loading")}
+                      text={message.content || (isSending ? processingInsightFromTrace(message.trace, processingStatus) : "")}
+                    />
                   ) : null}
                 </div>
               </motion.article>
@@ -290,6 +291,93 @@ function hasBothAxes(chart: ChartBundle) {
   if (!encoding || typeof encoding !== "object" || Array.isArray(encoding)) return false;
   const record = encoding as Record<string, unknown>;
   return Boolean(record.x && record.y);
+}
+
+type MarkdownBlock =
+  | { type: "paragraph"; lines: string[] }
+  | { type: "list"; ordered: boolean; items: string[] };
+
+export function AssistantMarkdown({ className, text }: { className?: string; text: string }) {
+  const blocks = parseMarkdownBlocks(text);
+
+  return (
+    <div className={className} aria-live="polite">
+      {blocks.map((block, index) => {
+        if (block.type === "list") {
+          const ListTag = block.ordered ? "ol" : "ul";
+          return (
+            <ListTag key={`${block.type}-${index}`}>
+              {block.items.map((item, itemIndex) => (
+                <li key={`${itemIndex}-${item}`}>{renderMarkdownInline(item)}</li>
+              ))}
+            </ListTag>
+          );
+        }
+
+        return <p key={`${block.type}-${index}`}>{renderMarkdownInline(block.lines.join(" "))}</p>;
+      })}
+    </div>
+  );
+}
+
+function parseMarkdownBlocks(text: string): MarkdownBlock[] {
+  const blocks: MarkdownBlock[] = [];
+  let paragraph: string[] = [];
+  let list: Extract<MarkdownBlock, { type: "list" }> | null = null;
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push({ type: "paragraph", lines: paragraph });
+    paragraph = [];
+  };
+
+  const flushList = () => {
+    if (!list) return;
+    blocks.push(list);
+    list = null;
+  };
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (orderedMatch || bulletMatch) {
+      flushParagraph();
+      const ordered = Boolean(orderedMatch);
+      const item = orderedMatch?.[1] ?? bulletMatch?.[1] ?? "";
+      if (!list || list.ordered !== ordered) {
+        flushList();
+        list = { type: "list", ordered, items: [] };
+      }
+      list.items.push(item);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks.length ? blocks : [{ type: "paragraph", lines: [""] }];
+}
+
+function renderMarkdownInline(text: string) {
+  return text.split(/(\*\*.+?\*\*|`.+?`)/g).filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`")) {
+      return <code key={`${part}-${index}`}>{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
 }
 
 function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void }) {

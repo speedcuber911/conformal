@@ -6,7 +6,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { DuckDBStore } from "@/lib/duckdb-store";
-import { applyChatEvent, ChatPanel, consumeNdjson, processingInsightFromTrace, starters, useProcessingStatus } from "./ChatPanel";
+import { applyChatEvent, AssistantMarkdown, ChatPanel, consumeNdjson, processingInsightFromTrace, starters, useProcessingStatus } from "./ChatPanel";
 import { LiveChart } from "./LiveChart";
 import type { ChartBundle, ChatMessage } from "./types";
 
@@ -319,7 +319,9 @@ function MobileChat({
           {chartCount} {chartCount === 1 ? "chart" : "charts"} <span aria-hidden="true">→</span>
         </button>
       ) : null}
-      {lastAssistant?.content || isSending ? <p className={cn("mobile-answer", !lastAssistant?.content && isSending && "mobile-answer-loading")}>{lastAssistant?.content || backendStatus}</p> : null}
+      {lastAssistant?.content || isSending ? (
+        <AssistantMarkdown className={cn("mobile-answer", !lastAssistant?.content && isSending && "mobile-answer-loading")} text={lastAssistant?.content || backendStatus} />
+      ) : null}
       <div className="mobile-followups" aria-label="Follow up prompts">
         {starters.slice(1, 5).map((starter) => (
           <button type="button" key={starter.prompt} onClick={() => onSubmit(undefined, starter.prompt)} disabled={isSending}>
