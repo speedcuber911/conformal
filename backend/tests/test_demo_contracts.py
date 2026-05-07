@@ -16,6 +16,12 @@ from backend.pipeline import run_pipeline
 
 DEMO_CONTRACTS = [
     {
+        "id": "fy26_close_vs_plan",
+        "question": "How is FY26 closing? Where are we vs plan?",
+        "visual_types": {"bar_chart"},
+        "must_mention": ["FY26", "plan", "shortfall"],
+    },
+    {
         "id": "revenue_12_months",
         "question": "revenue over last 12 months",
         "visual_types": {"line_chart"},
