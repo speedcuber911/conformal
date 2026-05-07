@@ -288,13 +288,13 @@ function MobileHome({ onAsk }: { onAsk: (prompt: string) => void }) {
         </article>
       </section>
 
-      <section className={cn("mobile-home-build", intro.complete && "mobile-home-build-complete")} aria-live="polite" aria-label="Demo question generation status">
-        <strong>{intro.complete ? "Demo questions ready" : "Building demo questions"}</strong>
+      <section className={cn("mobile-home-build", intro.complete && "mobile-home-build-complete")} aria-live="polite" aria-label="Question generation status">
+        <strong>{intro.complete ? "Questions ready" : "Building questions"}</strong>
         <span>{intro.complete ? "Source trails and chart rationale are locked." : questionBankBuildSteps[intro.currentStep]}</span>
       </section>
 
-      <section className="mobile-home-list" aria-label="Demo questions">
-        <h2>Demo questions</h2>
+      <section className="mobile-home-list" aria-label="Business questions">
+        <h2>Business questions</h2>
         {businessStarters.slice(0, 3).map((starter, index) =>
           index < intro.revealedCount ? (
             <button type="button" key={starter.prompt} onClick={() => onAsk(starter.prompt)}>

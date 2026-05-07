@@ -894,16 +894,6 @@ textarea:focus-visible {
   line-height: 1.25;
 }
 
-.question-bank-build li:not(:last-child)::after {
-  position: absolute;
-  top: 7px;
-  right: 10px;
-  left: 23px;
-  height: 1px;
-  background: rgba(222, 215, 204, 0.95);
-  content: "";
-}
-
 .question-bank-build li span {
   position: relative;
   z-index: 1;
@@ -997,14 +987,13 @@ textarea:focus-visible {
 }
 
 .hero-query-grid button {
-  display: grid;
-  min-height: 178px;
-  align-content: start;
-  gap: 9px;
+  display: flex;
+  min-height: 188px;
+  flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 253, 248, 0.82);
-  padding: 15px;
+  padding: 16px;
   color: #20201d;
   text-align: left;
   font-size: 14px;
@@ -1024,9 +1013,10 @@ textarea:focus-visible {
 .query-card-kicker {
   display: flex;
   min-width: 0;
+  min-height: 22px;
   align-items: center;
   gap: 8px;
-  margin-bottom: 1px;
+  margin-bottom: 10px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 780;
@@ -1061,6 +1051,8 @@ textarea:focus-visible {
 }
 
 .hero-query-grid button strong {
+  min-height: 60px;
+  margin-bottom: 8px;
   color: #1c1a18;
   font-size: 15px;
   font-weight: 760;
@@ -1068,6 +1060,8 @@ textarea:focus-visible {
 }
 
 .hero-query-grid button small {
+  min-height: 52px;
+  margin-bottom: 10px;
   color: #6c665f;
   font-size: 12px;
   font-weight: 540;
@@ -1075,8 +1069,9 @@ textarea:focus-visible {
 }
 
 .hero-query-grid button i {
-  align-self: end;
-  margin-top: 2px;
+  display: block;
+  width: 100%;
+  margin-top: auto;
   border-top: 1px solid #eee8de;
   padding-top: 9px;
   color: #9a2730;
@@ -1088,15 +1083,15 @@ textarea:focus-visible {
 
 .query-card-skeleton {
   position: relative;
-  display: grid;
-  min-height: 178px;
-  align-content: start;
-  gap: 12px;
+  display: flex;
+  min-height: 188px;
+  flex-direction: column;
+  gap: 0;
   overflow: hidden;
   border: 1px solid rgba(222, 215, 204, 0.78);
   border-radius: 12px;
   background: rgba(255, 253, 248, 0.62);
-  padding: 15px;
+  padding: 16px;
   box-shadow: 0 16px 34px rgba(44, 35, 20, 0.035);
 }
 
@@ -1124,24 +1119,27 @@ textarea:focus-visible {
 .query-card-skeleton span {
   width: 46%;
   height: 14px;
+  margin-bottom: 18px;
 }
 
 .query-card-skeleton strong {
   width: 86%;
   height: 18px;
+  margin-bottom: 50px;
 }
 
 .query-card-skeleton small {
   width: 70%;
   height: 46px;
   border-radius: 9px;
+  margin-bottom: 10px;
 }
 
 .query-card-skeleton i {
   align-self: end;
   width: 78%;
   height: 13px;
-  margin-top: 13px;
+  margin-top: auto;
 }
 
 @keyframes skeleton-sheen {

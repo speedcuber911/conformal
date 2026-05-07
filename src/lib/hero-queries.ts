@@ -84,7 +84,7 @@ function financeEvents(lower: string): ChatEvent[] {
       ? chart(
           "finance-ebitda-trend",
           "EBITDA trend vs budget",
-          "Monthly EBITDA is shown against budget so the demo answers the finance question directly rather than defaulting to a regional sales split.",
+          "Monthly EBITDA is shown against budget so the cockpit answers the finance question directly rather than defaulting to a regional sales split.",
           "-- hero:finance_ebitda_timeseries\nSELECT month, ebitda_cr, budget_ebitda_cr FROM financial_performance ORDER BY month",
           {
             data: { name: "data" },
@@ -175,8 +175,8 @@ function financeEvents(lower: string): ChatEvent[] {
       chartMode === "ebitda"
         ? "EBITDA is on a steady upward run-rate and is broadly tracking ahead of the early-period budget line. The important point is that the answer is using the monthly finance P&L table, so EBITDA is not being inferred from regional revenue cuts."
         : chartMode === "revenue"
-          ? "Revenue is trending upward across the 24-month demo period, with the latest months running above the early baseline and close to budget. This is a finance time-series answer, not the earlier revenue-by-zone fallback."
-          : "Revenue and EBITDA are both improving over the monthly demo period, with EBITDA rising alongside revenue rather than decoupling from the top line. The result comes from the monthly finance P&L grain, which is the right dataset for leadership finance questions.",
+          ? "Revenue is trending upward across the 24-month operating period, with the latest months running above the early baseline and close to budget. This is a finance time-series answer, not the earlier revenue-by-zone fallback."
+          : "Revenue and EBITDA are both improving over the monthly operating period, with EBITDA rising alongside revenue rather than decoupling from the top line. The result comes from the monthly finance P&L grain, which is the right dataset for leadership finance questions.",
       [
         chartMode === "ebitda"
           ? "The EBITDA chart compares actual EBITDA crore to budget EBITDA crore month by month, so variance is visible without mixing in regional sales dimensions."
@@ -468,7 +468,7 @@ function genericEvents(): ChatEvent[] {
     ...baseTrace("secondary_sales"),
     { type: "chart", chart: payload },
     finalResponse(
-      "I started from secondary sales because it is the broadest executive signal in the current demo warehouse. The first scan suggests North is lagging the pack, so the next useful cut is to separate whether this is a region issue, a product mix issue, or a field execution issue.",
+      "I started from secondary sales because it is the broadest executive signal in the current operating warehouse. The first scan suggests North is lagging the pack, so the next useful cut is to separate whether this is a region issue, a product mix issue, or a field execution issue.",
       [
         "The regional sales chart ranks latest-quarter revenue by region, giving a quick view of where the demand signal is strongest and weakest.",
         "Because this is an aggregate view, it should be treated as a triage chart rather than a root-cause answer.",

@@ -128,7 +128,7 @@ export const trustStarters: StarterPrompt[] = [
   {
     domain: "Limits",
     label: "Limits",
-    prompt: "What can this demo not answer yet? Be clear about static workbook scope, live SAP or Ariba refresh, and synthetic customer data.",
+    prompt: "What can this cockpit not answer yet? Be clear about static workbook scope, live SAP or Ariba refresh, and synthetic customer data.",
     detail: "Graceful limitation state for product credibility.",
     group: "trust",
     responseKind: "limits",
@@ -139,7 +139,7 @@ export const starters = [...businessStarters, ...trustStarters];
 const followUpStarters = [businessStarters[2], businessStarters[4], businessStarters[5], ...trustStarters];
 
 export const questionBankBuildSteps = [
-  "Reading leadership priorities and recent demo searches.",
+  "Reading leadership priorities and recent operating searches.",
   "Scoring questions by business relevance and evidence depth.",
   "Matching cards to verified finance, channel, procurement, and field-force routes.",
   "Locking source trails, assumptions, chart rationale, and limits.",
@@ -272,14 +272,14 @@ export function buildPreparedTrustResponse(prompt: string, history: ChatMessage[
   if (!currentAnswer) {
     return {
       trace,
-      content: "Run one of the business questions first, then this trust probe will explain the source trail, assumptions, chart choice, or demo limits for that answer.",
+      content: "Run one of the business questions first, then this trust probe will explain the source trail, assumptions, chart choice, or operating limits for that answer.",
     };
   }
 
   if (kind === "source") return { trace, content: sourceTrailForAnswer(currentAnswer) };
   if (kind === "assumptions") return { trace, content: assumptionsForAnswer(currentAnswer) };
   if (kind === "chart-choice") return { trace, content: chartRationaleForAnswer(currentAnswer) };
-  return { trace, content: limitsForDemo() };
+  return { trace, content: limitsForCockpit() };
 }
 
 function trustKindForPrompt(prompt: string): StarterPrompt["responseKind"] | null {
@@ -290,7 +290,7 @@ function trustKindForPrompt(prompt: string): StarterPrompt["responseKind"] | nul
   if (lower.includes("where did") || lower.includes("source") || lower.includes("sql") || lower.includes("row count")) return "source";
   if (lower.includes("assumption") || lower.includes("fiscal-year") || lower.includes("fiscal year")) return "assumptions";
   if (lower.includes("chart") && (lower.includes("why") || lower.includes("choose") || lower.includes("type"))) return "chart-choice";
-  if (lower.includes("can this demo not answer") || lower.includes("limits") || lower.includes("not answer yet")) return "limits";
+  if (lower.includes("can this cockpit not answer") || lower.includes("limits") || lower.includes("not answer yet")) return "limits";
   return null;
 }
 
@@ -299,7 +299,7 @@ function preparedTrustTrace(kind: NonNullable<StarterPrompt["responseKind"]>): T
     source: "Source trail assembled from current answer artifacts",
     assumptions: "Interpreter assumptions extracted from current answer artifacts",
     "chart-choice": "Chart rationale prepared from rendered evidence",
-    limits: "Demo limits prepared from product scope",
+    limits: "Operating limits prepared from product scope",
   } satisfies Record<NonNullable<StarterPrompt["responseKind"]>, string>;
 
   return [{
@@ -364,13 +364,13 @@ function chartRationaleForAnswer(message: ChatMessage) {
   ].join("\n");
 }
 
-function limitsForDemo() {
+function limitsForCockpit() {
   return [
-    "Clear limits for this demo:",
+    "Clear limits for this cockpit:",
     "",
-    "- It answers from the loaded SFS demo workbook and deterministic demo backend, not live transactional systems.",
+    "- It answers from the loaded SFS workbook and deterministic analytics backend, not live transactional systems.",
     "- SAP, Ariba, CRM, Growth Book, and regulatory-system refreshes are not live unless those connectors are explicitly wired.",
-    "- Customer and distributor data in this environment should be treated as synthetic/static demo data.",
+    "- Customer and distributor data in this environment should be treated as synthetic/static operating data.",
     "- It is an operating-analysis cockpit, not an approval, write-back, or financial close system.",
     "- Any leadership decision should still use the exported SQL/CSV trail for validation before action.",
   ].join("\n");
@@ -756,7 +756,7 @@ function WelcomeState({ onPickPrompt }: { onPickPrompt: (prompt: string) => void
   return (
     <div className="welcome-state">
       <div className="welcome-copy">
-        <span>Leadership demo bank</span>
+        <span>Leadership question bank</span>
         <h1>
           Leadership questions, <em>ready</em>
         </h1>
