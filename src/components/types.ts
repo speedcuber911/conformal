@@ -26,6 +26,9 @@ export type ChartBundle = {
   stackKeys?: string[];
   generatedAt?: number;
   rows?: Record<string, unknown>[];
+  analysisContent?: string;
+  analysisTrace?: TraceEvent[];
+  relatedCharts?: string[];
 };
 
 export type ChatMessage = {

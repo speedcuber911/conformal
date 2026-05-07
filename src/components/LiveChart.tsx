@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Pin, PinOff, RefreshCw, Table2, Trash2 } from "lucide-react";
+import { Check, Copy, FileText, Pin, PinOff, RefreshCw, Table2, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Area,
@@ -11,6 +11,7 @@ import {
   Cell,
   Line,
   LineChart,
+  ReferenceLine,
   Scatter,
   ScatterChart,
   XAxis,
@@ -54,8 +55,14 @@ const SERIES_COLORS = ["#bd2430", "#2f7d87", "#bc7a22", "#5f7d4f", "#d86b73", "#
 export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove }: LiveChartProps) {
   const [query, setQuery] = useState<QueryState>({ rows: [], loading: true, tables: [] });
   const [copied, setCopied] = useState<"sql" | "csv" | null>(null);
+  const isAnalysisReport = chart.visualType === "analysis_report";
 
   const runQuery = useCallback(async () => {
+    if (isAnalysisReport) {
+      setQuery({ rows: [], loading: false, tables: [] });
+      return;
+    }
+
     setQuery((current) => ({ ...current, loading: true, error: undefined }));
 
     if (chart.rows?.length) {
@@ -85,7 +92,7 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
         error: error instanceof Error ? error.message : "Query failed.",
       });
     }
-  }, [chart.rows, chart.sql]);
+  }, [chart.rows, chart.sql, isAnalysisReport]);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +108,7 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
   }, [runQuery]);
 
   useEffect(() => {
-    if (!live || chart.rows?.length) return;
+    if (!live || chart.rows?.length || isAnalysisReport) return;
 
     let cleanup: (() => void) | undefined;
     let active = true;
@@ -120,10 +127,10 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
       active = false;
       cleanup?.();
     };
-  }, [chart.rows, chart.sql, live, runQuery]);
+  }, [chart.rows, chart.sql, isAnalysisReport, live, runQuery]);
 
   const copy = async (kind: "sql" | "csv") => {
-    const text = kind === "sql" ? chart.sql : rowsToCsv(query.rows);
+    const text = kind === "sql" ? chart.sql : isAnalysisReport ? analysisReportToText(chart) : rowsToCsv(query.rows);
     await navigator.clipboard.writeText(text);
     setCopied(kind);
     window.setTimeout(() => setCopied(null), 1400);
@@ -138,14 +145,18 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
           {chart.description && chart.span !== 1 ? <p>{chart.description}</p> : null}
         </div>
         <div className="chart-actions">
-          <button type="button" title="Refresh" onClick={runQuery}>
-            <RefreshCw size={15} className={query.loading ? "animate-spin" : undefined} />
-          </button>
-          <button type="button" title="Copy SQL" onClick={() => copy("sql")}>
-            {copied === "sql" ? <Check size={15} /> : <Copy size={15} />}
-          </button>
-          <button type="button" title="Copy CSV" onClick={() => copy("csv")} disabled={!query.rows.length}>
-            <Table2 size={15} />
+          {!isAnalysisReport ? (
+            <>
+              <button type="button" title="Refresh" onClick={runQuery}>
+                <RefreshCw size={15} className={query.loading ? "animate-spin" : undefined} />
+              </button>
+              <button type="button" title="Copy SQL" onClick={() => copy("sql")}>
+                {copied === "sql" ? <Check size={15} /> : <Copy size={15} />}
+              </button>
+            </>
+          ) : null}
+          <button type="button" title={isAnalysisReport ? "Copy analysis" : "Copy CSV"} onClick={() => copy("csv")} disabled={!isAnalysisReport && !query.rows.length}>
+            {isAnalysisReport ? <FileText size={15} /> : <Table2 size={15} />}
           </button>
           {onPin ? (
             <button type="button" title={pinned ? "Pinned" : "Pin chart"} onClick={() => onPin(chart)}>
@@ -161,7 +172,9 @@ export function LiveChart({ chart, live = true, pinned, compact, onPin, onRemove
       </header>
 
       <div className="chart-canvas">
-        {query.loading && !query.rows.length ? (
+        {isAnalysisReport ? (
+          <GeneratedAnalysisReport chart={chart} />
+        ) : query.loading && !query.rows.length ? (
           <div className="chart-loading">Running SQL and preparing chart</div>
         ) : query.error ? (
           <div className="chart-empty">
@@ -232,6 +245,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
           <CartesianGrid horizontal={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} type="number" tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
           <YAxis {...axisProps} type="category" dataKey={model.xKey} width={70} />
+          {crossesZero(model) ? <ReferenceLine x={0} stroke="#91887c" strokeDasharray="3 3" /> : null}
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
           <Bar dataKey={model.yKeys[0]} radius={[0, 5, 5, 0]} fill={`var(--color-${cssVarKey(model.yKeys[0])})`} />
         </BarChart>
@@ -246,6 +260,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
           <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForSeries(model)} />
+          {crossesZero(model) ? <ReferenceLine y={0} stroke="#91887c" strokeDasharray="3 3" /> : null}
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
           {model.yKeys.map((key, index) => (
             <Bar key={key} dataKey={key} radius={[5, 5, 0, 0]} fill={`var(--color-${cssVarKey(key)})`} opacity={index ? 0.72 : 1} />
@@ -262,6 +277,7 @@ function GeneratedChart({ chart, rows, compact }: { chart: ChartBundle; rows: Re
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis {...axisProps} dataKey={model.xKey} />
           <YAxis {...axisProps} width={yAxisWidth} tickFormatter={formatAxisTick} domain={domainForStackedSeries(model)} />
+          {crossesZero(model) ? <ReferenceLine y={0} stroke="#91887c" strokeDasharray="3 3" /> : null}
           <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
           <ChartLegend content={<ChartLegendContent />} />
           {model.yKeys.map((key) => (
@@ -374,6 +390,32 @@ function GeneratedTable({ chart, rows }: { chart: ChartBundle; rows: Record<stri
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function GeneratedAnalysisReport({ chart }: { chart: ChartBundle }) {
+  const trace = chart.analysisTrace ?? [];
+  const completed = trace.filter((item) => item.status === "complete").length;
+  const errored = trace.filter((item) => item.status === "error").length;
+
+  return (
+    <div className="analysis-report-card">
+      <div className="analysis-report-summary">
+        <strong>{stripInlineMarkdown(chart.analysisContent || chart.description || "Pinned analysis from the cockpit conversation.")}</strong>
+        <span>
+          {completed} completed artifacts
+          {errored ? ` · ${errored} needs review` : ""}
+          {chart.relatedCharts?.length ? ` · ${chart.relatedCharts.length} linked charts` : ""}
+        </span>
+      </div>
+      {chart.relatedCharts?.length ? (
+        <ul className="analysis-report-links">
+          {chart.relatedCharts.slice(0, 6).map((title) => (
+            <li key={title}>{title}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -581,7 +623,7 @@ function domainForValues(values: number[]): [number | "auto", number | "auto"] {
   if (min >= 0) return [0, niceCeiling(max * 1.08)];
 
   const padding = Math.max((max - min) * 0.12, 2);
-  return [Math.floor(min - padding), niceCeiling(max + padding)];
+  return [niceFloor(min - padding), max <= 0 ? 0 : niceCeiling(max + padding)];
 }
 
 function shouldUseDualAxis(model: ChartModel) {
@@ -600,6 +642,34 @@ function niceCeiling(value: number) {
   const normalized = value / magnitude;
   const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
   return niceNormalized * magnitude;
+}
+
+function niceFloor(value: number) {
+  if (!Number.isFinite(value) || value >= 0) return 0;
+  return -niceCeiling(Math.abs(value));
+}
+
+function crossesZero(model: ChartModel) {
+  const values = model.data.flatMap((row) => model.yKeys.map((key) => Number(row[key])).filter(Number.isFinite));
+  return values.some((value) => value < 0) && values.some((value) => value > 0);
+}
+
+function analysisReportToText(chart: ChartBundle) {
+  const lines = [
+    chart.title,
+    chart.description ?? "",
+    chart.analysisContent ?? "",
+    chart.relatedCharts?.length ? `Linked charts: ${chart.relatedCharts.join(", ")}` : "",
+  ];
+  return lines.filter(Boolean).join("\n\n");
+}
+
+function stripInlineMarkdown(value: string) {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cssVarKey(key: string) {

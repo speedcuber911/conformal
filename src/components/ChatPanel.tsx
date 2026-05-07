@@ -1,8 +1,8 @@
 "use client";
 
-import { CirclePlus, Loader2, Send } from "lucide-react";
+import { CirclePlus, Loader2, Pin, PinOff, Send } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { PromptInput, PromptInputActions, PromptInputTextarea } from "@/components/ui/prompt-input";
@@ -431,9 +431,6 @@ export function ChatPanel({ live, pinnedIds, onPinChart, onWorkspaceActiveChange
   const messageListRef = useRef<HTMLDivElement>(null);
   const processingStatus = useProcessingStatus(isSending);
 
-  const activeCharts = useMemo(() => messages.flatMap((message) => message.charts ?? []), [messages]);
-  const displayCharts = useMemo(() => pickDisplayCharts(activeCharts), [activeCharts]);
-  const kpiChart = displayCharts[0] ?? activeCharts[0];
   const hasConversation = messages.length > 0 || isSending;
 
   useEffect(() => {
@@ -563,6 +560,15 @@ export function ChatPanel({ live, pinnedIds, onPinChart, onWorkspaceActiveChange
                         text={message.content || (activeAssistant ? processingInsightFromTrace(message.trace, processingStatus) : "")}
                       />
                     ) : null}
+                    {message.role === "assistant" ? (
+                      <InlineAnalysisArtifacts
+                        message={message}
+                        active={activeAssistant}
+                        live={live}
+                        pinnedIds={pinnedIds}
+                        onPinChart={onPinChart}
+                      />
+                    ) : null}
                   </div>
                 </motion.article>
               );
@@ -596,25 +602,64 @@ export function ChatPanel({ live, pinnedIds, onPinChart, onWorkspaceActiveChange
         ) : null}
       </section>
 
-      <section className="canvas-pane">
-        <div className={cn("chart-stack", activeCharts.length && "chart-stack-active")}>
-          {activeCharts.length ? (
-            <>
-              <KpiStrip chart={kpiChart} />
-              {displayCharts.map((chart) => (
-                <LiveChart key={chart.id} chart={chart} live={live} pinned={pinnedIds.has(chart.id)} onPin={onPinChart} />
-              ))}
-            </>
-          ) : (
-            <div className="empty-canvas">
-              <span>Charts appear after a query runs.</span>
-              <small>The canvas keeps each analysis live while source tables move.</small>
-            </div>
-          )}
-        </div>
-      </section>
     </div>
   );
+}
+
+function InlineAnalysisArtifacts({
+  message,
+  active,
+  live,
+  pinnedIds,
+  onPinChart,
+}: {
+  message: ChatMessage;
+  active: boolean;
+  live: boolean;
+  pinnedIds: Set<string>;
+  onPinChart: (chart: ChartBundle) => void;
+}) {
+  const charts = pickDisplayCharts(message.charts ?? []);
+  const report = buildPinnedAnalysisReport(message);
+  const canPinReport = Boolean(message.content.trim() || charts.length);
+
+  if (!charts.length && !canPinReport) return null;
+
+  return (
+    <div className="inline-analysis">
+      {canPinReport ? (
+        <div className="inline-analysis-actions">
+          <button type="button" onClick={() => onPinChart(report)} disabled={active}>
+            {pinnedIds.has(report.id) ? <PinOff size={15} /> : <Pin size={15} />}
+            {pinnedIds.has(report.id) ? "Pinned full analysis" : "Pin full analysis"}
+          </button>
+        </div>
+      ) : null}
+
+      {charts.length ? (
+        <div className="inline-chart-grid" aria-label="Inline analysis charts">
+          {charts.map((chart) => (
+            <LiveChart key={chart.id} chart={chart} live={live} pinned={pinnedIds.has(chart.id)} onPin={onPinChart} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function buildPinnedAnalysisReport(message: ChatMessage): ChartBundle {
+  return {
+    id: `analysis-report-${message.id}`,
+    title: "Full analysis",
+    description: "Pinned narrative, artifact trace, and linked charts from the cockpit conversation.",
+    sql: "-- Pinned full analysis report. Source SQL is available on each linked chart artifact.",
+    visualType: "analysis_report",
+    span: 2,
+    generatedAt: Date.now(),
+    analysisContent: message.content.trim(),
+    analysisTrace: message.trace,
+    relatedCharts: (message.charts ?? []).map((chart) => chart.title),
+  };
 }
 
 function ChatComposer({
@@ -995,6 +1040,7 @@ function asPlainRecord(value: unknown): Record<string, unknown> {
 }
 
 function TraceSummary({ trace, active }: { trace: TraceEvent[]; active: boolean }) {
+  const [open, setOpen] = useState(false);
   const completedSteps = trace.filter((item) => item.type !== "tool_start" && !item.id.startsWith("sql-"));
   const plan = extractPlan(trace);
   const progress = extractAnalysisProgress(trace);
@@ -1003,293 +1049,42 @@ function TraceSummary({ trace, active }: { trace: TraceEvent[]; active: boolean 
   const running = active && trace.some((item) => item.status === "running");
   const status = active ? (running ? "Building thought-through artifacts" : "Preparing analysis") : "Analysis artifacts ready";
   const count = totalAnalyses ? `${analysesDone}/${totalAnalyses} evidence checks` : `${completedSteps.length || trace.length} steps`;
+  const visibleArtifacts = trace.filter((item) => item.type !== "tool_start").slice(0, 18);
 
   return (
-    <div className="trace-summary">
-      <CirclePlus size={15} />
-      <span>{status}</span>
-      <small>{count}</small>
+    <div className={cn("trace-shell", open && "trace-shell-open")}>
+      <button type="button" className="trace-summary" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+        <CirclePlus size={15} />
+        <span>{status}</span>
+        <small>{open ? "Hide artifact trail" : count}</small>
+      </button>
+      {open ? (
+        <div className="trace-artifacts" aria-label="Visible analysis artifact trail">
+          <div className="trace-artifacts-note">
+            Visible artifact trail: planner decisions, SQL runs, chart/table artifacts, and source evidence. Hidden model reasoning is not exposed.
+          </div>
+          {plan?.analyses.length ? <PlanProgress trace={trace} /> : null}
+          <ol>
+            {visibleArtifacts.map((item) => (
+              <li key={item.id}>
+                <strong>{item.label}</strong>
+                <span>{artifactDetail(item)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
     </div>
   );
 }
 
-type KpiCard = {
-  label: string;
-  value: string;
-  unit?: string;
-  detail: string;
-  tone?: "up" | "down" | "neutral";
-};
-
-const defaultKpis: KpiCard[] = [
-  { label: "Field Coverage", value: "73%", detail: "▲ +4pp vs plan", tone: "up" },
-  { label: "Farmer NPS", value: "62", detail: "▼ -3 vs last qtr", tone: "down" },
-  { label: "Orders Booked", value: "₹14.2", unit: "Cr", detail: "▲ +12% vs plan", tone: "up" },
-];
-
-function KpiStrip({ chart }: { chart?: ChartBundle }) {
-  const cards = buildKpiCards(chart);
-
-  return (
-    <div className="kpi-strip">
-      {cards.map((card) => (
-        <article key={card.label}>
-          <span>{card.label}</span>
-          <strong className="kpi-value">
-            <span className="kpi-number">{card.value}</span>
-            {card.unit ? <em>{card.unit}</em> : null}
-          </strong>
-          <small className={card.tone}>{card.detail}</small>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function buildKpiCards(chart?: ChartBundle): KpiCard[] {
-  const rows = chart?.rows ?? [];
-  if (!rows.length) return defaultKpis;
-
-  const columns = Object.keys(rows[0] ?? {});
-  const numericColumns = columns.filter((column) => rows.some((row) => Number.isFinite(Number(row[column]))));
-  if (!numericColumns.length) return defaultKpis;
-
-  const text = `${chart?.title ?? ""} ${chart?.description ?? ""} ${chart?.sql ?? ""}`.toLowerCase();
-  const period = describeKpiPeriod(rows);
-
-  const revenueKey = findColumn(numericColumns, /revenue.*(?:inr|cr)|net_sales_value_inr/);
-  const ebitdaKey = findColumn(numericColumns, /ebitda.*(?:inr|cr)/);
-  if (revenueKey && ebitdaKey) {
-    const revenue = sumColumn(rows, revenueKey);
-    const ebitda = sumColumn(rows, ebitdaKey);
-    const marginKey = findColumn(numericColumns, /ebitda.*pct|margin/);
-    const margin = marginKey ? averageColumn(rows, marginKey) : revenue ? (ebitda / revenue) * 100 : 0;
-    return [
-      { label: "Revenue", ...formatCurrencyMetric(revenueKey, revenue), detail: period, tone: "neutral" },
-      { label: "EBITDA", ...formatCurrencyMetric(ebitdaKey, ebitda), detail: period, tone: "neutral" },
-      { label: "EBITDA margin", value: `${formatNumber(margin, 1)}%`, detail: "weighted from result", tone: margin >= 0 ? "up" : "down" },
-    ];
-  }
-
-  if (revenueKey) {
-    const total = sumColumn(rows, revenueKey);
-    const average = averageColumn(rows, revenueKey);
-    const peak = maxRow(rows, revenueKey);
-    return [
-      { label: "Revenue", ...formatCurrencyMetric(revenueKey, total), detail: period, tone: "neutral" },
-      { label: "Avg / month", ...formatCurrencyMetric(revenueKey, average), detail: "monthly run-rate", tone: "neutral" },
-      {
-        label: "Peak month",
-        ...formatCurrencyMetric(revenueKey, peak.value),
-        detail: peak.label,
-        tone: "up",
-      },
-    ];
-  }
-
-  const totalValueKey = findColumn(numericColumns, /total.*value.*(?:inr|cr)|invoice.*value.*(?:inr|cr)|collection.*amount.*(?:inr|cr)|inventory.*value.*(?:inr|cr)|sell.*value.*(?:inr|cr)|spend.*cr|savings.*cr/);
-  const premiumKey = findColumn(numericColumns, /premium.*pct/);
-  if (text.includes("procurement") || premiumKey) {
-    const cards: KpiCard[] = [];
-    if (totalValueKey) cards.push({ label: "Spend value", ...formatCurrencyMetric(totalValueKey, sumColumn(rows, totalValueKey)), detail: period, tone: "neutral" });
-    if (premiumKey) cards.push({ label: "Market premium", value: `${formatNumber(averageColumn(rows, premiumKey), 1)}%`, detail: "avg from returned rows", tone: averageColumn(rows, premiumKey) > 0 ? "down" : "up" });
-    return padKpis(cards, rows);
-  }
-
-  const coverageKey = findColumn(numericColumns, /coverage|visit.*pct|completion.*pct/);
-  const npsKey = findColumn(numericColumns, /nps|score/);
-  const ordersKey = findColumn(numericColumns, /order|booked|volume/);
-  if (coverageKey || npsKey || ordersKey) {
-    return padKpis([
-      ...(coverageKey ? [{ label: labelFromColumn(coverageKey), value: `${formatNumber(averageColumn(rows, coverageKey), 0)}%`, detail: period, tone: trendTone(rows, coverageKey) }] : []),
-      ...(npsKey ? [{ label: labelFromColumn(npsKey), value: formatNumber(averageColumn(rows, npsKey), 0), detail: period, tone: trendTone(rows, npsKey) }] : []),
-      ...(ordersKey ? [{ label: labelFromColumn(ordersKey), value: formatNumber(sumColumn(rows, ordersKey), 0), detail: period, tone: trendTone(rows, ordersKey) }] : []),
-    ], rows);
-  }
-
-  return padKpis(
-    numericColumns.slice(0, 3).map((column) => {
-      const aggregate = isAverageMetric(column) ? averageColumn(rows, column) : sumColumn(rows, column);
-      return {
-        label: labelFromColumn(column),
-        ...formatMetricValue(column, aggregate),
-        detail: period,
-        tone: trendTone(rows, column),
-      };
-    }),
-    rows,
-  );
-}
-
-function padKpis(cards: KpiCard[], rows: Record<string, unknown>[]) {
-  const scopedCards = [...cards];
-
-  for (const segment of segmentKpis(rows)) {
-    if (scopedCards.length >= 3) break;
-    if (scopedCards.some((card) => card.label.toLowerCase() === segment.label.toLowerCase())) continue;
-    scopedCards.push(segment);
-  }
-
-  if (scopedCards.length < 3) {
-    scopedCards.push({ label: "Records", value: formatCompactNumber(rows.length), detail: "in scope", tone: "neutral" });
-  }
-
-  return scopedCards.slice(0, 3);
-}
-
-function segmentKpis(rows: Record<string, unknown>[]): KpiCard[] {
-  const columns = Object.keys(rows[0] ?? {});
-  return columns
-    .flatMap((column) => {
-      if (/(^|_)(date|month|quarter|week|period|year)($|_)/i.test(column)) return [];
-      const values = rows
-        .map((row) => row[column])
-        .filter((value) => value !== null && value !== undefined && String(value).trim())
-        .map((value) => String(value).trim());
-      if (!values.length || values.every((value) => Number.isFinite(Number(value)))) return [];
-      const unique = new Set(values);
-      if (unique.size < 2 || unique.size > Math.max(24, rows.length * 0.75)) return [];
-      return [{
-        label: labelFromColumn(column),
-        value: formatCompactNumber(unique.size),
-        detail: unique.size === 1 ? "segment" : "segments",
-        tone: "neutral" as const,
-      }];
-    });
-}
-
-function findColumn(columns: string[], pattern: RegExp) {
-  return columns.find((column) => pattern.test(column.toLowerCase()));
-}
-
-function sumColumn(rows: Record<string, unknown>[], column: string) {
-  return rows.reduce((sum, row) => sum + numericValue(row[column]), 0);
-}
-
-function averageColumn(rows: Record<string, unknown>[], column: string) {
-  const values = rows.map((row) => numericValue(row[column])).filter(Number.isFinite);
-  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
-}
-
-function maxRow(rows: Record<string, unknown>[], column: string): { value: number; label: string } {
-  const periodKey = Object.keys(rows[0] ?? {}).find((key) => /month|quarter|week|date|year/i.test(key));
-  const fallback = { value: 0, label: "highest in scope" };
-  return rows.reduce<{ value: number; label: string }>((best, row) => {
-    const value = numericValue(row[column]);
-    if (value <= best.value) return best;
-    const rawLabel = periodKey ? String(row[periodKey] ?? "") : "";
-    return { value, label: rawLabel ? formatPeriodLabel(rawLabel) : "highest in scope" };
-  }, fallback);
-}
-
-function numericValue(value: unknown) {
-  const number = Number(value);
-  return Number.isFinite(number) ? number : 0;
-}
-
-function describeKpiPeriod(rows: Record<string, unknown>[]) {
-  const periodKey = Object.keys(rows[0] ?? {}).find((key) => /month|quarter|week|date|year/i.test(key));
-  if (!periodKey) return "total in scope";
-  const values = Array.from(new Set(rows.map((row) => String(row[periodKey])).filter(Boolean)));
-  if (!values.length) return "total in scope";
-  if (values.length === 1) return formatPeriodLabel(values[0]);
-  return `${formatPeriodLabel(values[0])} - ${formatPeriodLabel(values[values.length - 1])}`;
-}
-
-function trendTone(rows: Record<string, unknown>[], column: string): KpiCard["tone"] {
-  if (rows.length < 2) return "neutral";
-  const first = numericValue(rows[0][column]);
-  const last = numericValue(rows[rows.length - 1][column]);
-  if (last > first) return "up";
-  if (last < first) return "down";
-  return "neutral";
-}
-
-function formatInCrore(value: number): Pick<KpiCard, "value" | "unit"> {
-  return { value: `₹${formatNumber(value / 10_000_000, 1)}`, unit: "Cr" };
-}
-
-function formatCurrencyMetric(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
-  if (/(^|_)cr$/i.test(column) || /_cr($|_)/i.test(column)) return { value: `₹${formatNumber(value, 1)}`, unit: "Cr" };
-  return formatInCrore(value);
-}
-
-function formatMetricValue(column: string, value: number): Pick<KpiCard, "value" | "unit"> {
-  if (/inr|_cr$|value|amount|revenue|ebitda|sales|spend/i.test(column)) return formatCurrencyMetric(column, value);
-  if (/pct|percent|coverage|margin|rate|premium/i.test(column)) return { value: `${formatNumber(value, 1)}%` };
-  if (/qty|quantity|units|volume/i.test(column)) return { value: formatCompactNumber(value), unit: "units" };
-  return { value: formatCompactNumber(value) };
-}
-
-function isAverageMetric(column: string) {
-  return /pct|percent|coverage|margin|rate|premium|nps|score/i.test(column);
-}
-
-function labelFromColumn(column: string) {
-  const normalized = column.toLowerCase().replace(/^(sum|avg|count|min|max)_/, "");
-  const known: Record<string, string> = {
-    revenue_cr: "Revenue",
-    revenue_inr: "Revenue",
-    sales_value: "Sales",
-    sales_value_inr: "Sales",
-    net_sales_value: "Net sales",
-    net_value_inr: "Net sales",
-    value_inr: "Value",
-    invoice_value_inr: "Invoice value",
-    spend_cr: "Spend value",
-    savings_vs_market_cr: "Savings",
-    ebitda_cr: "EBITDA",
-    ebitda_inr: "EBITDA",
-    ebitda_pct: "EBITDA margin",
-    qty_units: "Volume",
-    quantity_units: "Volume",
-    region: "Regions",
-    category: "Categories",
-    business_unit: "Business units",
-    distributor_name: "Distributors",
-    supplier_name: "Suppliers",
-    material_category: "Categories",
-    premium_vs_market_pct: "Market premium",
-    coverage_pct: "Coverage",
-    farmer_nps: "Farmer NPS",
-    nps: "Farmer NPS",
-  };
-  return (
-    known[normalized] ??
-    normalized
-      .replace(/_inr$/, "")
-      .replace(/_pct$/, "")
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase())
-  );
-}
-
-function formatCompactNumber(value: number) {
-  if (!Number.isFinite(value)) return "0";
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000) return `${trimCompact(value / 1_000_000_000)}B`;
-  if (abs >= 1_000_000) return `${trimCompact(value / 1_000_000)}M`;
-  if (abs >= 1_000) return `${trimCompact(value / 1_000)}K`;
-  return formatNumber(value, Number.isInteger(value) ? 0 : 1);
-}
-
-function trimCompact(value: number) {
-  return value.toFixed(value >= 100 ? 0 : 1).replace(/\.0$/, "");
-}
-
-function formatNumber(value: number, digits: number) {
-  if (!Number.isFinite(value)) return "0";
-  return value.toLocaleString("en-IN", {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: digits,
-  }).replace(/\\.0$/, "");
-}
-
-function formatPeriodLabel(value: string) {
-  const monthMatch = value.match(/^(20\d{2})-(\d{2})$/);
-  if (!monthMatch) return value;
-  const date = new Date(`${value}-01T00:00:00`);
-  return date.toLocaleString("en-IN", { month: "short", year: "numeric" });
+function artifactDetail(item: TraceEvent) {
+  const status = item.status ? `${item.status}` : "complete";
+  const detail = item.detail ?? item.sql ?? "";
+  const suffix = item.durationMs ? ` · ${item.durationMs}ms` : "";
+  if (!detail) return status + suffix;
+  const compact = detail.replace(/\s+/g, " ").trim();
+  return `${status}${suffix} · ${compact.length > 180 ? `${compact.slice(0, 177)}...` : compact}`;
 }
 
 export async function consumeNdjson(stream: ReadableStream<Uint8Array>, onEvent: (eventData: Record<string, unknown>) => void) {
