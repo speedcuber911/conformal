@@ -146,9 +146,9 @@ Important accuracy note: the SOC 2 card says `SOC 2 Type II in progress` with a 
 
 ### The People
 
-`PeopleSection` uses two anonymous founder credential tables. There are no names, initials, photos, alt text, or comments that identify the founders.
+`PeopleSection` uses two anonymous horizontal founder narratives: a left rail with role and credibility tags, and a right column with characterization and prose. There are no names, initials, photos, alt text, or comments that identify the founders.
 
-Credential values support `*asterisk*` muted emphasis through `renderMutedSyntax()`. The emphasized text is rendered as non-italic muted text.
+Founder prose supports `**bold**` primary emphasis for outcomes, `//muted//` emphasis for firm names, and `*italic-red*` emphasis in the characterization line through `renderInline()`.
 
 ### FAQ
 

@@ -10,7 +10,7 @@ const pillars = [
   {
     icon: Target,
     title: "Pick one decision that matters",
-    body: "Not a transformation programme. A single executive question that an entire org currently struggles to answer in a week — and we make answerable in seconds.",
+    body: "Not a transformation programme. A single executive question that an entire org currently struggles to answer in a week, made answerable in seconds.",
   },
   {
     icon: ToolCase,
@@ -33,13 +33,13 @@ const steps = [
   },
   {
     number: "02",
-    week: "Weeks 2–4",
+    week: "Weeks 2 to 4",
     title: "Build the agent end-to-end",
     body: "A working product on real data. Reviewed weekly by the executive who will use it. Your engineers paired with ours.",
   },
   {
     number: "03",
-    week: "Weeks 5–6",
+    week: "Weeks 5 to 6",
     title: "Ship to production",
     body: "Real users, your infrastructure, your domain. Every agent call logged, every chart pinnable, every prompt diff-able.",
   },
@@ -55,7 +55,7 @@ const beliefs = [
   {
     label: "Belief one",
     headline: "Agents are the new application, not the new feature.",
-    body: "For thirty years, software was built around forms — fields, screens, click paths. Agents collapse that into a single conversation that writes its own queries, composes its own interfaces, and ends with a decision. The companies that internalize this will run on a different operating model in five years. Most are still bolting chatbots onto Salesforce.",
+    body: "For thirty years, software was built around forms: fields, screens, click paths. Agents collapse that into a single conversation that writes its own queries, composes its own interfaces, and ends with a decision. The companies that internalize this will run on a different operating model in five years. Most are still bolting chatbots onto Salesforce.",
   },
   {
     label: "Belief two",
@@ -65,12 +65,12 @@ const beliefs = [
   {
     label: "Belief three",
     headline: "Trust is built by showing the reasoning.",
-    body: "Every agent we ship streams its reasoning in plain view — the tools it called, the SQL it wrote, the time each step took. Executives don't trust black boxes; they trust working things they can audit. The trace rail is the most important UI in the product, not the answer.",
+    body: "Every agent we ship streams its reasoning in plain view: the tools it called, the SQL it wrote, the time each step took. Executives don't trust black boxes; they trust working things they can audit. The trace rail is the most important UI in the product, not the answer.",
   },
   {
     label: "Belief four",
     headline: "The deliverable is your team's fluency.",
-    body: "A working agent is the artefact. Your engineers being able to ship the next one without us is the deliverable. We measure every engagement by what your team can do on the Monday after we leave — and we structure the contract so that the faster you become independent, the more value you get.",
+    body: "A working agent is the artefact. Your engineers being able to ship the next one without us is the deliverable. We measure every engagement by what your team can do on the Monday after we leave, and we structure the contract so that the faster you become independent, the more value you get.",
   },
 ] as const;
 
@@ -78,91 +78,56 @@ const trustCards = [
   { icon: ShieldCheck, title: "Deploys inside your VPC", body: "AWS, Azure, GCP, or on-prem. No data egress except to the LLM provider you choose." },
   { icon: Lock, title: "SOC 2 Type II in progress", body: "Security controls are being formalized now, with a Q3 2026 Type II target. Current controls shared under NDA." },
   { icon: History, title: "Full audit trail", body: "Every prompt, tool call, SQL query, and answer logged with timestamps, cost, and trace IDs." },
-  { icon: BadgeCheck, title: "DPIA & DPA ready", body: "Standard data processing agreements and impact assessments — signed within a week, not a quarter." },
+  { icon: BadgeCheck, title: "DPIA & DPA ready", body: "Standard data processing agreements and impact assessments, signed within a week, not a quarter." },
   { icon: Code, title: "Source code escrow", body: "All code is your code from day one. Repo in your GitHub org, commits attributed to your engineers." },
   { icon: Cpu, title: "Model-provider neutral", body: "Anthropic, OpenAI, Azure OpenAI, open-weight. You pick, you pay the provider, you switch when you want." },
 ] as const;
 
 const founderEng = {
-  role: "Co-founder · Engineering",
-  tagline: "Built and scaled the platforms",
-  credentials: [
-    {
-      label: "Now",
-      value: "VP Engineering at an AI-native education company. Architects multimodal LLM systems — STT, reasoning, TTS at sub-second latency.",
-    },
-    {
-      label: "Recently",
-      value: "Principal Engineer at an enterprise SaaS company that *scaled from 10K to 600K+ users* in two years, across the top global IT services firms.",
-    },
-    {
-      label: "Before",
-      value: "Senior engineer at Amazon — built core payments. Co-founded two startups, one of which processed *100K+ monthly orders*.",
-    },
-    {
-      label: "Shipped",
-      value: "Microsoft Teams App Store apps, agentic AI bots, RAG pipelines, serverless platforms on AWS. A Microsoft App Store launch.",
-    },
-    {
-      label: "Trained at",
-      value: "BITS Pilani, Chemical Engineering. Self-taught everything after.",
-    },
+  role: "Engineering",
+  tags: ["BITS Pilani", "Amazon", "Microsoft App Store"],
+  characterization: "Built and scaled the platforms. The kind of engineer who ships *agentic systems* in production, not in slide decks.",
+  paragraphs: [
+    "Currently VP Engineering at an AI-native education company, architecting **multimodal LLM systems**: speech-to-text, reasoning, and voice synthesis stitched together at sub-second latency across distributed US-India teams.",
+    "Before that, Principal Engineer at an enterprise SaaS company, where he **scaled the flagship product from 10,000 to over 600,000 users** across the largest global IT services firms, and shipped an agentic AI assistant published on the Microsoft Teams App Store. The platform he built now runs production workloads for roughly a fifth of the Indian IT services market.",
+    "Earlier, senior engineer at //Amazon//, where he built core payment experiences, including Scan & Pay and the Amazon Pay merchant ecosystem. Co-founded two startups along the way, one of which processed **100,000+ monthly orders** at peak.",
   ],
 };
 
 const founderStrat = {
-  role: "Co-founder · Strategy",
-  tagline: "Funded and shipped the bets",
-  credentials: [
-    {
-      label: "Now",
-      value: "Heads market insights at a high-growth AI company. Runs GTM, product strategy, and M&A.",
-    },
-    {
-      label: "Recently",
-      value: "Investor at *General Catalyst, Accel, and WestBridge*. Deployed capital across GenAI, software, and consumer.",
-    },
-    {
-      label: "Before",
-      value: "Consultant at *Boston Consulting Group* — large-scale transformation programs in BFSI, consumer, IT, and health.",
-    },
-    {
-      label: "Recognized",
-      value: "*30 Under 30 Global Business Leader.* Published research on AI in drug discovery.",
-    },
-    {
-      label: "Trained at",
-      value: "The Wharton School (MBA). BITS Pilani, B.E. Hons. Bilingual analyst before joining tech.",
-    },
+  role: "Strategy",
+  tags: ["Wharton MBA", "Accel", "General Catalyst", "BCG", "30 Under 30"],
+  characterization: "Funded and shipped the bets. The kind of operator who has sat *on both sides* of the table.",
+  paragraphs: [
+    "Currently heads market insights at a high-growth AI company, leading **GTM, product strategy, and M&A**, the kind of role where decisions get made in a Slack thread and shipped that week.",
+    "Spent two years investing at //General Catalyst, Accel, and WestBridge Capital// across **GenAI, software, cybersecurity, and consumer.** Sourced and led diligence on companies now valued in the billions. Before that, two years at //Boston Consulting Group// driving large-scale transformation programs across BFSI, IT, consumer, and healthcare.",
+    "Wharton MBA. Named a **30 Under 30 Global Business Leader.** Has also published peer-reviewed research on AI in drug discovery, back when \"AI in drug discovery\" wasn't a pitch.",
   ],
 };
 
-const combinedAchievements = [
-  "Built platforms used by 600K+ users",
-  "Shipped on the Microsoft App Store",
-  "Invested across 3 venture funds",
-  "Advised 4 BCG transformation programs",
-  "Founded 4 companies",
-  "Hired 200+ engineers and analysts",
-  "Trained at BITS Pilani · Wharton · Amazon · BCG",
+const combinedFounderStats = [
+  { value: "600K+", label: "Users on platforms they've shipped" },
+  { value: "4", label: "Companies founded between them" },
+  { value: "3", label: "Venture funds invested across" },
+  { value: "10+ yrs", label: "Building and funding software" },
 ] as const;
 
 const faqs = [
   {
     q: "How is this different from hiring McKinsey or Bain?",
-    a: "They write the roadmap. We build the thing the roadmap calls for. Both have a place — but the bottleneck inside most enterprises today is execution, not strategy. We don't compete with them; we ship what they recommend.",
+    a: "They write the roadmap. We build the thing the roadmap calls for. Both have a place, but the bottleneck inside most enterprises today is execution, not strategy. We don't compete with them; we ship what they recommend.",
   },
   {
     q: "Do you work with a specific LLM provider?",
-    a: "We're model-neutral. Anthropic Claude, OpenAI GPT, Azure OpenAI, open-weight models on your own GPUs — we'll deploy what fits your security envelope and your budget. The provider contract is between you and them; we don't take a margin on inference.",
+    a: "We're model-neutral. Anthropic Claude, OpenAI GPT, Azure OpenAI, open-weight models on your own GPUs can all work. We'll deploy what fits your security envelope and your budget. The provider contract is between you and them; we don't take a margin on inference.",
   },
   {
     q: "What does an engagement cost?",
-    a: "A standard six-week engagement runs ₹40–80 lakh fixed-fee, with a small completion bonus tied to whether the agent is in production by the end. Pricing happens in conversation, not on a page — but we never charge by the slide deck and never offer a retainer.",
+    a: "A standard six-week engagement runs ₹40 to 80 lakh fixed-fee, with a small completion bonus tied to whether the agent is in production by the end. Pricing happens in conversation, not on a page, but we never charge by the slide deck and never offer a retainer.",
   },
   {
     q: "What if our data isn't ready?",
-    a: "It rarely is. The first week of every engagement is a data-shape diagnostic — we look at what exists, what's reachable, and what would block an agent from working. If the gap is large, we say so and the engagement waits until the foundation is right. We don't sell engagements that won't ship.",
+    a: "It rarely is. The first week of every engagement is a data-shape diagnostic. We look at what exists, what's reachable, and what would block an agent from working. If the gap is large, we say so and the engagement waits until the foundation is right. We don't sell engagements that won't ship.",
   },
   {
     q: "Who owns the code?",
@@ -170,7 +135,7 @@ const faqs = [
   },
   {
     q: "Will you talk to our board?",
-    a: "Yes — but only after week three, when there's a working product to show. We don't present unbuilt ideas to audit committees or AI steering groups. Demo-driven governance is part of how we keep engagements honest.",
+    a: "Yes, but only after week three, when there's a working product to show. We don't present unbuilt ideas to audit committees or AI steering groups. Demo-driven governance is part of how we keep engagements honest.",
   },
 ] as const;
 
@@ -252,28 +217,36 @@ function SmartLink({ children, className, href }: { children: ReactNode; classNa
   return <a className={className} href={href}>{children}</a>;
 }
 
-function Divider({ children }: { children: ReactNode }) {
+function Divider({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <p className="conformal-divider mb-6 flex items-center gap-3.5 text-[11px] font-medium uppercase tracking-[0.16em] text-[color:var(--muted)]">
+    <p className={cx("conformal-divider mb-6 flex items-center gap-3.5 text-[11px] font-medium uppercase tracking-[0.16em] text-[color:var(--muted)]", className)}>
       <span>{children}</span>
       <span className="h-px flex-1 bg-[color:var(--line)]" />
     </p>
   );
 }
 
-function Pill({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-[color:var(--line)] bg-[color:var(--panel-soft)] px-2.5 py-1 text-[11px] tracking-[0.01em] text-[color:var(--muted)]">
-      {children}
-    </span>
-  );
-}
+function renderInline(value: string) {
+  return value.split(/(\*\*[^*]+\*\*|\/\/[^/]+\/\/|\*[^*]+\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return (
+        <strong key={`${part}-${index}`} className="font-medium text-[color:var(--foreground)]">
+          {part.slice(2, -2)}
+        </strong>
+      );
+    }
 
-function renderMutedSyntax(value: string) {
-  return value.split(/(\*[^*]+\*)/g).map((part, index) => {
+    if (part.startsWith("//") && part.endsWith("//")) {
+      return (
+        <em key={`${part}-${index}`} className="not-italic text-[color:var(--muted)] opacity-70">
+          {part.slice(2, -2)}
+        </em>
+      );
+    }
+
     if (part.startsWith("*") && part.endsWith("*")) {
       return (
-        <em key={`${part}-${index}`} className="not-italic text-[color:var(--muted)]">
+        <em key={`${part}-${index}`} className="italic text-[#B8232E]">
           {part.slice(1, -1)}
         </em>
       );
@@ -401,58 +374,75 @@ function TrustSecuritySection() {
   );
 }
 
-function FounderCard({ role, tagline, credentials }: typeof founderEng) {
+function Tag({ children }: { children: ReactNode }) {
   return (
-    <div>
-      <div className="mb-3.5 flex items-center gap-2.5">
-        <div className="h-[42px] w-[42px] rounded-full border border-[color:var(--line)] bg-[color:var(--panel-soft)]" aria-hidden="true" />
-        <div>
-          <p className="mb-0.5 text-[11px] font-medium uppercase tracking-[0.1em] text-[#B8232E]">{role}</p>
-          <p className="m-0 text-[13px] font-medium text-[color:var(--foreground)]">{tagline}</p>
+    <span className="mb-1 mr-1 inline-flex items-center rounded-full border border-[color:var(--line)] bg-[color:var(--panel-soft)] px-2.5 py-1 text-[11px] font-medium tracking-[0.01em] text-[color:var(--foreground)]">
+      {children}
+    </span>
+  );
+}
+
+function FounderEntry({ role, tags, characterization, paragraphs }: typeof founderEng) {
+  return (
+    <Reveal className="grid gap-6 border-b border-[color:var(--line)] py-9 last:border-b-0 md:grid-cols-[200px_1fr] md:gap-12">
+      <div>
+        <div className="mb-3.5 h-[38px] w-[38px] rounded-full border border-[color:var(--line)] bg-[color:var(--panel-soft)]" aria-hidden="true" />
+        <p className="mb-1 text-[11px] font-medium uppercase tracking-[0.1em] text-[#B8232E]">Co-founder</p>
+        <p className="m-0 text-[13px] font-medium text-[color:var(--foreground)]">{role}</p>
+        <div className="mt-[18px] flex flex-wrap">
+          {tags.map((tag) => (
+            <Tag key={tag}>{tag}</Tag>
+          ))}
         </div>
       </div>
-      <div className="flex flex-col">
-        {credentials.map((credential) => (
-          <div key={credential.label} className="grid grid-cols-[96px_1fr] gap-4 border-b border-[color:var(--line)] py-3.5 last:border-b-0 sm:grid-cols-[120px_1fr] sm:gap-5">
-            <p className="m-0 text-[11px] font-medium uppercase tracking-[0.1em] text-[color:var(--muted)]">{credential.label}</p>
-            <p className="m-0 text-[13px] leading-[1.55] text-[color:var(--foreground)]">{renderMutedSyntax(credential.value)}</p>
-          </div>
+      <div>
+        <p className="mb-[18px] font-serif text-[21px] font-normal leading-[1.4] tracking-normal text-[color:var(--foreground)]">
+          {renderInline(characterization)}
+        </p>
+        {paragraphs.map((paragraph) => (
+          <p key={paragraph} className="mb-3.5 text-[14.5px] leading-[1.75] text-[color:var(--muted)] last:mb-0">
+            {renderInline(paragraph)}
+          </p>
         ))}
       </div>
-    </div>
+    </Reveal>
   );
 }
 
 function PeopleSection() {
   return (
-    <Section>
-      <div className="mb-12 grid gap-10 md:grid-cols-[1fr_1.3fr] md:gap-16">
+    <section className="conformal-section border-t border-[color:var(--line)] px-5 py-14 md:px-14 md:py-20">
+      <div className="mb-12 grid gap-6 md:grid-cols-[1fr_1.2fr] md:items-end md:gap-16">
         <Reveal>
           <Divider>The people</Divider>
-          <h2 className="conformal-section-title mb-4 font-serif text-4xl font-normal leading-[1.15] tracking-normal text-[color:var(--foreground)]">
-            A small team. Senior on every call.
+          <h2 className="conformal-section-title m-0 font-serif text-4xl font-normal leading-[1.15] tracking-normal text-[color:var(--foreground)]">
+            A small team. <em className="not-italic text-[#B8232E]">Senior on every call.</em>
           </h2>
-          <p className="mb-3.5 text-[15px] leading-[1.75] text-[color:var(--muted)]">
-            Conformal is built around a small group of operators. The two founders have spent the last decade either inside the kind of company that hires us, or at the firms our clients are trying to buy from.
-          </p>
+        </Reveal>
+        <Reveal>
           <p className="m-0 text-[15px] leading-[1.75] text-[color:var(--muted)]">
-            Every engagement is staffed by two senior people, full-time. No analyst layer. No partner who shows up at kickoff and vanishes. You speak with the people writing the code.
+            Conformal is built around two founders and a small group of engineers. Every engagement is staffed by two senior people, full-time, with no analyst layer, no partner who shows up at kickoff and vanishes. You speak with the people writing the code.
           </p>
         </Reveal>
-        <div className="grid gap-8 lg:grid-cols-2 lg:gap-6">
-          <Reveal><FounderCard {...founderEng} /></Reveal>
-          <Reveal><FounderCard {...founderStrat} /></Reveal>
-        </div>
       </div>
-      <div className="border-t border-[color:var(--line)] pt-8">
-        <Divider>Together, the founders have</Divider>
-        <div className="flex flex-wrap gap-1.5">
-          {combinedAchievements.map((item) => (
-            <Pill key={item}>{item}</Pill>
+
+      <div className="flex flex-col">
+        <FounderEntry {...founderEng} />
+        <FounderEntry {...founderStrat} />
+      </div>
+
+      <div className="mt-2 border-t border-[color:var(--line)] pt-8">
+        <Divider className="mb-[18px]">Between the two founders</Divider>
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
+          {combinedFounderStats.map((stat) => (
+            <Reveal key={stat.label}>
+              <p className="m-0 font-serif text-[34px] font-medium leading-none text-[color:var(--foreground)]">{stat.value}</p>
+              <p className="mt-2 text-xs leading-[1.5] text-[color:var(--muted)] opacity-80">{stat.label}</p>
+            </Reveal>
           ))}
         </div>
       </div>
-    </Section>
+    </section>
   );
 }
 
@@ -510,7 +500,7 @@ export function ConformalLandingPage() {
             We&apos;ve spent four years making the second-oldest companies act <em className="italic text-[#B8232E]">like the youngest.</em>
           </h1>
           <p className="conformal-hero-item conformal-hero-delay-2 mb-9 max-w-2xl text-lg leading-[1.65] text-[color:var(--muted)]">
-            Conformal builds the AI products that legacy enterprises actually ship — replacing slide decks with working software, six weeks at a time. We work with boards, CEOs, and the operators who answer to them.
+            Conformal builds the AI products that legacy enterprises actually ship, replacing slide decks with working software, six weeks at a time. We work with boards, CEOs, and the operators who answer to them.
           </p>
           <div className="conformal-hero-item conformal-hero-delay-3 flex flex-wrap items-center gap-3">
             <Button className="px-[18px] py-[11px]">
@@ -591,7 +581,7 @@ export function ConformalLandingPage() {
             <h2 className="conformal-display mx-auto mb-[22px] max-w-[780px] font-serif text-5xl font-normal leading-[1.08] tracking-normal text-[color:var(--foreground)] md:text-[54px]">
               One conversation. <em className="italic text-[#B8232E]">No deck.</em>
             </h2>
-            <p className="mx-auto mb-9 max-w-[520px] text-base leading-[1.7] text-[color:var(--muted)]">{"If you're an operator inside a large enterprise and you think one decision in your company is broken — write us. Forty-five minutes, no commitment."}</p>
+            <p className="mx-auto mb-9 max-w-[520px] text-base leading-[1.7] text-[color:var(--muted)]">{"If you're an operator inside a large enterprise and you think one decision in your company is broken, write us. Forty-five minutes, no commitment."}</p>
             <form className="conformal-email-capture mx-auto flex w-full max-w-[480px] items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--panel)] p-2 pl-[18px]" action="mailto:hello@conformal.live?subject=Conformal%20conversation" method="post" encType="text/plain">
               <label className="sr-only" htmlFor="conformal-email">Email address</label>
               <input id="conformal-email" name="email" className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[color:var(--foreground)] outline-none" placeholder="your@company.com" type="email" required />
