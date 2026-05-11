@@ -1,5 +1,5 @@
-import { CockpitShell } from "@/components/CockpitShell";
+import { ConformalLandingPage } from "@/components/landing";
 
 export default function Home() {
-  return <CockpitShell />;
+  return <ConformalLandingPage />;
 }

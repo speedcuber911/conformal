@@ -22,6 +22,10 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Landing Page
+
+The public home page is the Conformal studio landing page, not the cockpit demo. Its current positioning, proof sections, component map, metadata behavior, and verification notes are documented in [`Docs/LANDING_PAGE.md`](Docs/LANDING_PAGE.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
@@ -41,11 +45,11 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 Production runs on the shared ap-south-1 EC2 host behind the existing Dockerized nginx edge:
 
-- URL: https://dcmshriram.conformal.live
-- App path: `/home/ubuntu/partner-apps/dcmshriram`
-- Container: `partner-dcmshriram`
+- URL: https://conformal.live
+- App path: `/home/ubuntu/partner-apps/conformal`
+- Container: `partner-conformal`
 - Docker network: `cutcompanion_default`
-- Edge config reference: `deploy/nginx.dcmshriram.conf`
+- Edge config reference: `deploy/nginx.conformal.conf`
 
 Pushes to `main` run `.github/workflows/deploy.yml`, validate with `pnpm lint` and `pnpm build`, sync the app to EC2, rebuild the app container, and reload nginx.
 
@@ -64,21 +68,23 @@ ECEO_BACKEND_REQUIRED=1
 LLM_PROVIDER=azure_openai
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com
 AZURE_OPENAI_API_KEY=<secret>
-AZURE_OPENAI_GPT55_DEPLOYMENT=gpt-5.5
+AZURE_OPENAI_DEPLOYMENT=gpt-5.4-mini
 AZURE_OPENAI_API_STYLE=responses
-AZURE_OPENAI_TIMEOUT_MS=60000
+AZURE_OPENAI_TIMEOUT_MS=14000
+AZURE_OPENAI_MAX_OUTPUT_TOKENS=1200
 ```
 
 Optional overrides:
 
 ```bash
+AZURE_OPENAI_GPT55_DEPLOYMENT=gpt-5.5   # compatibility / strong-model fallback name
 AZURE_OPENAI_API_STYLE=chat
 AZURE_OPENAI_API_VERSION=2024-10-21
 AZURE_OPENAI_TIMEOUT_MS=14000
 AZURE_OPENAI_MAX_OUTPUT_TOKENS=1200
 ```
 
-Production deploys source `/etc/leap.env` before `docker compose`, so keep these values there and never commit secrets.
+Production deploys source `/etc/conformal.env` before `docker compose`, so keep these values there and never commit secrets.
 
 ### ECEO backend capabilities
 

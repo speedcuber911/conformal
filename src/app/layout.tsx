@@ -1,43 +1,54 @@
 import type { Metadata } from "next";
+import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://dcmshriram.conformal.live"),
-  title: "Project Leap Cockpit",
-  description: "Agentic executive cockpit for Shriram Farm Solutions",
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/sfs-logo.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  metadataBase: new URL("https://conformal.live"),
+  title: {
+    default: "Conformal",
+    template: "%s | Conformal",
+  },
+  description:
+    "Conformal turns four-year enterprise AI transformations into production agent programs across many engagements.",
+  applicationName: "Conformal",
+  alternates: {
+    canonical: "/",
   },
   openGraph: {
-    title: "Project Leap Cockpit",
-    description: "Agentic executive cockpit for Shriram Farm Solutions",
-    url: "https://dcmshriram.conformal.live/",
-    siteName: "Shriram Farm Solutions",
-    images: [
-      {
-        url: "/sfs-og.png",
-        width: 1200,
-        height: 630,
-        alt: "SFS Project Leap Cockpit",
-      },
-      {
-        url: "/sfs-logo.png",
-        width: 512,
-        height: 512,
-        alt: "SFS logo",
-      },
-    ],
+    title: "Conformal",
+    description:
+      "Four-year AI transformation programs delivered as many production agent engagements.",
+    url: "https://conformal.live/",
+    siteName: "Conformal",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Project Leap Cockpit",
-    description: "Agentic executive cockpit for Shriram Farm Solutions",
-    images: ["/sfs-og.png"],
+    title: "Conformal",
+    description:
+      "Four-year AI transformation programs delivered as many production agent engagements.",
   },
 };
 
@@ -47,7 +58,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html
+      lang="en"
+      className={`${inter.variable} ${fraunces.variable} ${jetBrainsMono.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
