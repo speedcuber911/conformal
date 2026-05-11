@@ -2,9 +2,9 @@
 
 Two routes for asking questions:
 
-- `POST /query` — synchronous; returns the full workflow state once the
+- `POST /query`: synchronous; returns the full workflow state once the
   pipeline has run end-to-end. Used by tests and the CLI.
-- `POST /query/stream` — Server-Sent Events; emits a sequence of typed events
+- `POST /query/stream`: Server-Sent Events; emits a sequence of typed events
   (`interpretation`, `plan`, `analysis_started`, `analysis_complete`,
   `narrative_chunk`, `presentation`, `done`) so the frontend can paint
   progressively. Drives the production demo UI.
@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
         conn.close()
 
 
-app = FastAPI(title="SFS Enterprise Chatbot — Phase 3", lifespan=lifespan)
+app = FastAPI(title="SFS Enterprise Chatbot | Phase 3", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -116,7 +116,7 @@ async def query_stream(req: QueryRequest):
                 on_event=on_event,
                 stream_narrative=True,
             )
-        except Exception as exc:  # noqa: BLE001 — surface to client
+        except Exception as exc:  # noqa: BLE001 - surface to client
             queue.put(("error", {"stage": "pipeline", "message": str(exc)}))
         finally:
             queue.put(SENTINEL)

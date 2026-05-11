@@ -1,5 +1,6 @@
 import { agentEvents } from "@/lib/agent-orchestrator";
 import type { ChartPayload, ChatEvent, ToolName } from "@/lib/agent-types";
+import { isDcmshriramSite } from "@/lib/site-variant";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,10 @@ function encode(event: ChatEvent) {
 }
 
 export async function POST(request: Request) {
+  if (!isDcmshriramSite()) {
+    return Response.json({ error: "Not found" }, { status: 404 });
+  }
+
   const body = (await request.json().catch(() => ({}))) as { message?: string; question?: string; history?: unknown };
   const message = body.message ?? body.question ?? "";
   const history = normalizeHistory(body.history);

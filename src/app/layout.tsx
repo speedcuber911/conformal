@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
+import { isDcmshriramSite } from "@/lib/site-variant";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,14 +25,14 @@ const jetBrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+const conformalMetadata: Metadata = {
   metadataBase: new URL("https://conformal.live"),
   title: {
-    default: "Conformal — AI transformation, in working code",
+    default: "Conformal | AI transformation, in working code",
     template: "%s | Conformal",
   },
   description:
-    "We build the AI products that legacy enterprises actually ship — replacing slide decks with working software, six weeks at a time.",
+    "We build the AI products that legacy enterprises actually ship, replacing slide decks with working software, six weeks at a time.",
   applicationName: "Conformal",
   alternates: {
     canonical: "/",
@@ -53,6 +54,30 @@ export const metadata: Metadata = {
       "AI transformation for enterprise leaders. We ship working agents in six weeks, not slide decks in six quarters.",
   },
 };
+
+const dcmshriramMetadata: Metadata = {
+  metadataBase: new URL("https://dcmshriram.conformal.live"),
+  title: "Project Leap Cockpit",
+  description: "Executive cockpit for Shriram Farm Solutions",
+  applicationName: "Project Leap Cockpit",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Project Leap Cockpit",
+    description: "Executive cockpit for Shriram Farm Solutions",
+    url: "https://dcmshriram.conformal.live/",
+    siteName: "Shriram Farm Solutions",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Project Leap Cockpit",
+    description: "Executive cockpit for Shriram Farm Solutions",
+  },
+};
+
+export const metadata: Metadata = isDcmshriramSite() ? dcmshriramMetadata : conformalMetadata;
 
 export default function RootLayout({
   children,

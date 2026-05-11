@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight, BadgeCheck, Code, Cpu, History, Lock, ShieldC
 import { ConformalMark } from "@/components/brand/ConformalMark";
 import { formatPostDate, posts } from "@/lib/journal";
 import { sectionTargetFromHref } from "@/lib/section-scroll";
+import { ConformalEmailCapture } from "./ConformalEmailCapture";
 import { SelectedWork } from "./SelectedWork";
 import { PendingSectionScroll, SectionScrollButton } from "./SectionScrollButton";
 import { StatsStrip } from "./StatsStrip";
@@ -601,13 +602,7 @@ export function ConformalLandingPage() {
               One conversation. <em className="italic text-[#B8232E]">No deck.</em>
             </h2>
             <p className="mx-auto mb-9 max-w-[520px] text-base leading-[1.7] text-[color:var(--muted)]">{"If you're an operator inside a large enterprise and you think one decision in your company is broken, write us. Forty-five minutes, no commitment."}</p>
-            <form className="conformal-email-capture mx-auto flex w-full max-w-[480px] items-center gap-2 rounded-full border border-[color:var(--line)] bg-[color:var(--panel)] p-2 pl-[18px]" action="mailto:hello@conformal.live?subject=Conformal%20conversation" method="post" encType="text/plain">
-              <label className="sr-only" htmlFor="conformal-email">Email address</label>
-              <input id="conformal-email" name="email" className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[color:var(--foreground)] outline-none" placeholder="your@company.com" type="email" required />
-              <button className={buttonClassName("primary", "px-[18px] py-[9px]")} type="submit">
-                Start a conversation <ArrowRight size={14} aria-hidden="true" />
-              </button>
-            </form>
+            <ConformalEmailCapture />
             <p className="mt-3.5 text-xs text-[color:var(--muted)]">
               Or <a className="text-[color:var(--foreground)] underline" href="mailto:hello@conformal.live">email a partner directly</a>
             </p>

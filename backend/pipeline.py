@@ -49,7 +49,7 @@ def run_pipeline(
     fire("interpretation", state.interpretation.model_dump())
 
     if not state.interpretation.intent_understood:
-        # Pipeline stops here — frontend renders the clarification.
+        # Pipeline stops here; frontend renders the clarification.
         fire("done", {})
         return state, []
 

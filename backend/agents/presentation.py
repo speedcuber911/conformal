@@ -104,7 +104,7 @@ def design_streaming(
     (everything before `---LAYOUT---`) and returns the parsed Presentation.
 
     The token splitter is lazy: we accumulate text and only forward chunks that
-    we're sure are still part of the narrative — once we see the marker, we
+    we're sure are still part of the narrative. Once we see the marker, we
     stop forwarding tokens and accumulate the rest into the layout buffer.
     """
     deterministic = _deterministic_demo_presentation(interpreted_question, results)

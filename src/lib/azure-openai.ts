@@ -29,10 +29,10 @@ export function getAzureOpenAiConfig(): AzureOpenAiConfig | null {
     endpoint,
     apiKey,
     deployment:
-      clean(process.env.AZURE_OPENAI_GPT55_DEPLOYMENT) ??
       clean(process.env.AZURE_OPENAI_DEPLOYMENT) ??
       clean(process.env.AZURE_OPENAI_DEPLOYMENT_NAME) ??
       clean(process.env.AZURE_OPENAI_MODEL) ??
+      clean(process.env.AZURE_OPENAI_GPT55_DEPLOYMENT) ??
       DEFAULT_DEPLOYMENT,
     apiStyle: clean(process.env.AZURE_OPENAI_API_STYLE) === "chat" ? "chat" : "responses",
     apiVersion: clean(process.env.AZURE_OPENAI_API_VERSION) ?? DEFAULT_CHAT_API_VERSION,

@@ -8,7 +8,7 @@ const engagements = [
     context: "₹12,000+ Cr revenue\n130 years old",
     status: "CEO decision cockpit · live",
     headline: "A natural-language agent for the executive committee",
-    body: "A top-three strategy consultancy wrote a 27-slide digital transformation roadmap. Slide 19 specified an \"Enterprise CEO Chatbot.\" We built it — an agent that writes its own SQL across eight business systems, composes a fresh visualization per question, and answers cross-functional leadership queries in under seven seconds. Now in production for the executive committee and the office of the CFO.",
+    body: "A top-three strategy consultancy wrote a 27-slide digital transformation roadmap. Slide 19 specified an \"Enterprise CEO Chatbot.\" We built it: an agent that writes its own SQL across eight business systems, composes a fresh visualization per question, and answers cross-functional leadership queries in under seven seconds. Now in production for the executive committee and the office of the CFO.",
     tags: ["Agentic SQL", "8 data sources", "11 weeks to production"],
   },
   {
@@ -32,7 +32,7 @@ const engagements = [
     context: "SME lending\nAUM ₹8,000 Cr",
     status: "Early-warning credit agent · live",
     headline: "Spotting deterioration before the EMI",
-    body: "A credit team was identifying risky accounts only after a missed payment. We built an agent that monitors GST filings, bank statement patterns, payroll behavior, and customer-side signals to surface SME borrowers showing early stress — typically eight weeks before the first default. Currently flagging 11–14% of the book monthly for relationship-manager review.",
+    body: "A credit team was identifying risky accounts only after a missed payment. We built an agent that monitors GST filings, bank statement patterns, payroll behavior, and customer-side signals to surface SME borrowers showing early stress, typically eight weeks before the first default. Currently flagging 11 to 14% of the book monthly for relationship-manager review.",
     tags: ["Multi-signal ingest", "Production scoring", "8 weeks"],
   },
   {
@@ -40,7 +40,7 @@ const engagements = [
     context: "Multi-generation\n$2B+ AUM",
     status: "Investment memo copilot · in production",
     headline: "Cutting deal-screening from days to hours",
-    body: "An IC was rejecting 80% of deals after a multi-day diligence sprint. We built an agent that drafts the first cut of every investment memo — sector context, comparable transactions, public-domain financial diligence, and red-flag detection. The IC now reaches a no-go decision in under three hours on rejects, freeing analyst time for the deals worth pursuing.",
+    body: "An IC was rejecting 80% of deals after a multi-day diligence sprint. We built an agent that drafts the first cut of every investment memo: sector context, comparable transactions, public-domain financial diligence, and red-flag detection. The IC now reaches a no-go decision in under three hours on rejects, freeing analyst time for the deals worth pursuing.",
     tags: ["Document drafting", "Public-data diligence", "6 weeks"],
   },
 ] as const;
@@ -68,7 +68,7 @@ export function SelectedWork() {
     <section id="selected-work" className="conformal-section border-t border-[color:var(--line)] px-6 py-16 md:px-9 md:py-20">
       <Divider>Selected work</Divider>
       <p className="-mt-3 mb-8 max-w-[580px] text-sm leading-relaxed text-[color:var(--muted)]">
-        Most of our engagements are under NDA. The descriptions below are accurate but anonymized — happy to share named references in private conversation.
+        Most of our engagements are under NDA. The descriptions below are accurate but anonymized. We are happy to share named references in private conversation.
       </p>
 
       <div className="flex flex-col">

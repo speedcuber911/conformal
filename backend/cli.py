@@ -27,7 +27,7 @@ def _print_event(event: str, data: dict) -> None:
     elif event == "plan":
         print(f"\n=== PLAN ({len(data.get('analyses', []))} analyses) ===")
         for a in data.get("analyses", []):
-            print(f"  {a['analysis_id']}: {a['type']} — {a['purpose']}")
+            print(f"  {a['analysis_id']}: {a['type']} - {a['purpose']}")
         print(f"  rationale: {data.get('plan_rationale', '')}")
     elif event == "analysis_started":
         print(f"\n--- running {data['analysis_id']}: {data['purpose']} ---")

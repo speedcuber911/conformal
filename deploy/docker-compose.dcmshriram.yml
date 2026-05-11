@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        SITE_VARIANT: dcmshriram
     image: dcmshriram-conformal:latest
     container_name: partner-dcmshriram
     environment:
@@ -10,6 +12,8 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
+      SITE_VARIANT: dcmshriram
+      NEXT_PUBLIC_SITE_VARIANT: dcmshriram
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_GPT55_DEPLOYMENT: ${AZURE_OPENAI_GPT55_DEPLOYMENT:-}
@@ -20,7 +24,7 @@ services:
       AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-}
       AZURE_OPENAI_TIMEOUT_MS: ${AZURE_OPENAI_TIMEOUT_MS:-}
       AZURE_OPENAI_MAX_OUTPUT_TOKENS: ${AZURE_OPENAI_MAX_OUTPUT_TOKENS:-}
-      ECEO_BACKEND_URL: http://backend:8000
+      ECEO_BACKEND_URL: http://partner-dcmshriram-backend:8000
       ECEO_BACKEND_REQUIRED: "1"
     expose:
       - "3000"

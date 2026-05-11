@@ -915,12 +915,9 @@ function PromptSection({
       <div className="hero-query-grid">
         {starters.map((starter, index) =>
           index < revealedCount ? (
-            <motion.button
+            <button
               type="button"
               key={starter.prompt}
-              initial={{ opacity: 0, y: 14, filter: "blur(5px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ duration: 0.34, ease: [0.19, 1, 0.22, 1] }}
               onClick={() => onPickPrompt(starter.prompt)}
             >
               <span className="query-card-kicker">
@@ -930,7 +927,7 @@ function PromptSection({
               <strong>{starter.prompt}</strong>
               <small>{starter.detail}</small>
               {starter.anchor ? <i>{starter.anchor}</i> : null}
-            </motion.button>
+            </button>
           ) : (
             <div className="query-card-skeleton" key={`skeleton-${starter.prompt}`} aria-hidden="true">
               <span />

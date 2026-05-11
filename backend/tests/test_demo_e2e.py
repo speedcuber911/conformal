@@ -83,7 +83,7 @@ def test_demo_question(case, db):
     # Every analysis should have executed (success or graceful failure).
     assert len(state.query_results) == len(state.plan.analyses)
     successful = [r for r in state.query_results if r.success]
-    assert successful, "no analyses succeeded — SQL all failed"
+    assert successful, "no analyses succeeded; SQL all failed"
 
     assert state.presentation is not None
     narrative = state.presentation.narrative

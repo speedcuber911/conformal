@@ -1,7 +1,7 @@
 """Agent 1: Interpreter.
 
 Decides whether the user question is clear enough to plan against, or whether
-to ask one clarifying question. No schema injection — only business intent.
+to ask one clarifying question. No schema injection; only business intent.
 """
 from __future__ import annotations
 

@@ -34,10 +34,10 @@ DEFAULT_ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
 DEFAULT_BEDROCK_MODEL = os.environ.get("BEDROCK_MODEL_ID")
 DEFAULT_AWS_REGION = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
 DEFAULT_AZURE_DEPLOYMENT = (
-    os.environ.get("AZURE_OPENAI_GPT55_DEPLOYMENT")
-    or os.environ.get("AZURE_OPENAI_DEPLOYMENT")
+    os.environ.get("AZURE_OPENAI_DEPLOYMENT")
     or os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME")
     or os.environ.get("AZURE_OPENAI_MODEL")
+    or os.environ.get("AZURE_OPENAI_GPT55_DEPLOYMENT")
     or "gpt-5.5"
 )
 DEFAULT_AZURE_API_STYLE = os.environ.get("AZURE_OPENAI_API_STYLE", "responses").strip().lower()
@@ -355,7 +355,7 @@ def complete_json(
     try:
         return json.loads(_extract_first_json(raw))
     except json.JSONDecodeError:
-        # One retry — re-prompt the model with the non-JSON output and ask for clean JSON.
+        # One retry: re-prompt the model with the non-JSON output and ask for clean JSON.
         retry_user = (
             f"{user}\n\n"
             "Your previous response was not valid JSON. Re-emit the same answer as a "

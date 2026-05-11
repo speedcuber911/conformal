@@ -3,6 +3,8 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
+      args:
+        SITE_VARIANT: conformal
     image: conformal-live:latest
     container_name: conformal-live
     environment:
@@ -10,6 +12,8 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
+      SITE_VARIANT: conformal
+      NEXT_PUBLIC_SITE_VARIANT: conformal
     expose:
       - "3000"
     restart: unless-stopped

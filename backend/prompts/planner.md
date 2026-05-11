@@ -18,18 +18,18 @@ Use these heuristics:
 
 5. **Each analysis must be independently meaningful**: don't fragment one logical pull into multiple analyses. "Revenue by region" is ONE analysis, not five (one per region).
 
-## Analysis types — pick from these
+## Analysis types: pick from these
 
 These are defined in detail in the analysis-patterns library. Use the exact type names:
 
-- `kpi_lookup` — single number or small set of numbers
-- `trend` — time series
-- `breakdown` — measure split by one or two dimensions
-- `ranking` — top-N or bottom-N on some measure
-- `comparison` — measure compared across two periods or two cohorts
-- `decomposition` — variance broken into component effects
-- `correlation` — relationship between two measures across a dimension
-- `composite_score` — multiple metrics combined per entity (e.g., distributor health = sales decline + DSO + sell-thru)
+- `kpi_lookup`: single number or small set of numbers
+- `trend`: time series
+- `breakdown`: measure split by one or two dimensions
+- `ranking`: top-N or bottom-N on some measure
+- `comparison`: measure compared across two periods or two cohorts
+- `decomposition`: variance broken into component effects
+- `correlation`: relationship between two measures across a dimension
+- `composite_score`: multiple metrics combined per entity (e.g., distributor health = sales decline + DSO + sell-thru)
 
 ## Output
 

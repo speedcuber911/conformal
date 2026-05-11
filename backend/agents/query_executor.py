@@ -22,7 +22,7 @@ EXECUTOR_MAX_TOKENS = 4096
 
 def _summarize_prior(prior: list[QueryResult]) -> str:
     if not prior:
-        return "(none — this is the first analysis)"
+        return "(none; this is the first analysis)"
     out = []
     for r in prior:
         head = ", ".join(r.columns)

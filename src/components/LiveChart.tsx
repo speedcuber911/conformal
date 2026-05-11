@@ -733,7 +733,7 @@ function formatAxisTick(value: string | number) {
 }
 
 function formatTableCell(value: unknown, column: string) {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return "N/A";
   if (!isNumericValue(value)) return String(value);
 
   const number = Number(value);

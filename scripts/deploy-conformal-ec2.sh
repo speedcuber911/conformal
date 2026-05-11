@@ -15,8 +15,9 @@ if [ -f /etc/conformal.env ]; then
   set +a
 fi
 
-docker compose -f "$COMPOSE_FILE" build app
-docker compose -f "$COMPOSE_FILE" up -d app
+docker compose -p conformal-live -f "$COMPOSE_FILE" build app
+docker rm -f conformal-live >/dev/null 2>&1 || true
+docker compose -p conformal-live -f "$COMPOSE_FILE" up -d app
 
 for attempt in $(seq 1 20); do
   if docker exec "$NGINX_CONTAINER" wget -qO- http://conformal-live:3000/api/health >/dev/null; then

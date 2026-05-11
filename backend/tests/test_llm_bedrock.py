@@ -15,6 +15,10 @@ def reload_llm(monkeypatch: pytest.MonkeyPatch, **env: str) -> object:
         "BEDROCK_MODEL_ID",
         "AWS_REGION",
         "AWS_DEFAULT_REGION",
+        "AZURE_OPENAI_DEPLOYMENT",
+        "AZURE_OPENAI_DEPLOYMENT_NAME",
+        "AZURE_OPENAI_MODEL",
+        "AZURE_OPENAI_GPT55_DEPLOYMENT",
     ):
         monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
@@ -93,3 +97,14 @@ def test_complete_text_stream_uses_bedrock_converse_stream(monkeypatch: pytest.M
     assert result == "hello from bedrock"
     assert tokens == ["hello", " from", " bedrock"]
     assert fake_client.converse_stream_calls[0]["modelId"] == "anthropic.claude-test"
+
+
+def test_azure_deployment_prefers_generic_fast_model(monkeypatch: pytest.MonkeyPatch):
+    module = reload_llm(
+        monkeypatch,
+        LLM_PROVIDER="azure_openai",
+        AZURE_OPENAI_DEPLOYMENT="gpt-5.4-mini",
+        AZURE_OPENAI_GPT55_DEPLOYMENT="gpt-5.5",
+    )
+
+    assert module.DEFAULT_AZURE_DEPLOYMENT == "gpt-5.4-mini"

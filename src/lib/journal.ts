@@ -34,7 +34,7 @@ export const posts: JournalPost[] = [
     slug: "why-enterprise-ai-roadmaps-die-at-slide-19",
     category: "Engineering",
     title: "Why most enterprise AI roadmaps die at slide 19",
-    dek: "The 47-slide deck specifies an \"Enterprise CEO Chatbot\" on slide 19. Then nothing happens for two years. Here's what we've learned about the gap between strategy and shipping — and the small structural changes that close it.",
+    dek: "The 47-slide deck specifies an \"Enterprise CEO Chatbot\" on slide 19. Then nothing happens for two years. Here's what we've learned about the gap between strategy and shipping, and the small structural changes that close it.",
     readTime: "7 min",
     publishedAt: "2026-04-12",
     sections: [
@@ -79,7 +79,7 @@ export const posts: JournalPost[] = [
     slug: "the-agent-writes-the-sql-the-system-around-it-does-the-hard-work",
     category: "Architecture",
     title: "The agent writes the SQL. The system around it does the hard work.",
-    dek: "Composable schema documentation, deterministic retries, the right way to stream tool-use traces. A field guide to the supporting cast around every production agent — and why getting it right matters more than which model you choose.",
+    dek: "Composable schema documentation, deterministic retries, the right way to stream tool-use traces. A field guide to the supporting cast around every production agent, and why getting it right matters more than which model you choose.",
     readTime: "11 min",
     publishedAt: "2026-03-28",
     sections: [
@@ -130,7 +130,7 @@ export const posts: JournalPost[] = [
     slug: "ai-strategy-is-an-oxymoron-pick-a-decision-instead",
     category: "Strategy",
     title: "\"AI strategy\" is an oxymoron. Pick a decision instead.",
-    dek: "The thirty most successful enterprise AI rollouts of the last eighteen months have one thing in common — they replaced a specific human decision, not a generic workflow. How to find the decision worth attacking, and the four signs you've picked the wrong one.",
+    dek: "The thirty most successful enterprise AI rollouts of the last eighteen months have one thing in common: they replaced a specific human decision, not a generic workflow. How to find the decision worth attacking, and the four signs you've picked the wrong one.",
     readTime: "9 min",
     publishedAt: "2026-03-15",
     sections: [
@@ -223,7 +223,7 @@ export const posts: JournalPost[] = [
     slug: "what-60-hours-of-cfo-interviews-taught-us-about-variance-bridges",
     category: "Field notes",
     title: "What 60 hours of CFO interviews taught us about variance bridges",
-    dek: "Before building a finance agent, we spent two months in the seats of the people who'd use it. The themes that emerged — and the ways they shaped the eventual product — are the most repeatable part of our process.",
+    dek: "Before building a finance agent, we spent two months in the seats of the people who'd use it. The themes that emerged, and the ways they shaped the eventual product, are the most repeatable part of our process.",
     readTime: "6 min",
     publishedAt: "2026-02-19",
     sections: [
@@ -317,7 +317,7 @@ export const posts: JournalPost[] = [
     slug: "we-do-live-engineering-interviews-heres-the-prompt",
     category: "Hiring",
     title: "We do live engineering interviews. Here's the prompt.",
-    dek: "No take-homes, no whiteboard puzzles. The 90-minute exercise we run with every engineering candidate — and what we're actually looking for inside it.",
+    dek: "No take-homes, no whiteboard puzzles. The 90-minute exercise we run with every engineering candidate, and what we're actually looking for inside it.",
     readTime: "5 min",
     publishedAt: "2026-01-22",
     sections: [
@@ -364,7 +364,7 @@ export const posts: JournalPost[] = [
     slug: "the-ceo-chatbot-is-a-category-not-a-feature",
     category: "Strategy",
     title: "The CEO chatbot is a category, not a feature",
-    dek: "Every large enterprise will have one in three years. The question isn't whether — it's who owns it inside the company, and what shape it takes. A framework.",
+    dek: "Every large enterprise will have one in three years. The question isn't whether. It is who owns it inside the company, and what shape it takes. A framework.",
     readTime: "10 min",
     publishedAt: "2026-01-08",
     sections: [
