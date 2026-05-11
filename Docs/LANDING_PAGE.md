@@ -55,11 +55,11 @@ The page proves credibility through:
 
 The public nav is:
 
-- Approach -> `#approach`
-- Work -> `#selected-work`
+- Approach -> hashless scroll to the `approach` section
+- Work -> hashless scroll to the `selected-work` section
 - Journal -> `/journal`
 
-`Journal` now links to the real journal route rather than a mailto.
+Section links are rendered through `SectionScrollButton`, so clicking them scrolls without leaving `#approach`, `#selected-work`, `#trust`, `#faq`, or `#conversation` in the browser URL. `Journal` links to the real journal route rather than a mailto.
 
 ## Component Map
 
@@ -87,7 +87,13 @@ Top-level public home page shell. It owns:
 It imports:
 
 - `StatsStrip`,
-- `SelectedWork`.
+- `SelectedWork`,
+- `SectionScrollButton`,
+- `sectionTargetFromHref` from `src/lib/section-scroll.ts`.
+
+### `SectionScrollButton.tsx`
+
+Client-side section navigation for the public site. It renders clean `/` links and performs `scrollIntoView()` in the browser, including cross-page jumps from `/journal` back to home sections through `sessionStorage`. It also removes any incoming hash after handling it, so shared old URLs with section fragments do not leave a fragment in the address bar once the page loads.
 
 ### `StatsStrip.tsx`
 
@@ -254,6 +260,8 @@ The public Conformal site is hosted on AWS Amplify Hosting, connected to the Git
 - Amplify branch: `main`
 - Build spec: `amplify.yml`
 
+GitHub Actions now runs `.github/workflows/deploy.yml` as website CI only: install, TypeScript, lint, and build. The deploy step is the Amplify GitHub integration, which starts a production build automatically after a successful push to `main`.
+
 Route53 keeps the apex `conformal.live` as an alias to the Amplify-managed CloudFront target. The `dcmshriram.conformal.live` record remains on EC2 for the analytics cockpit/demo runtime.
 
 Do not deploy the Conformal public site through the EC2 Docker/nginx path unless you are deliberately rolling back Amplify. Amplify is now the source of truth for public landing-page and journal deploys.
@@ -264,7 +272,7 @@ Use these checks after landing-page or journal edits:
 
 ```bash
 node node_modules/typescript/bin/tsc --noEmit
-node node_modules/eslint/bin/eslint.js src/components/brand/ConformalMark.tsx src/components/landing/ConformalLandingPage.tsx src/components/journal/JournalChrome.tsx src/components/journal/JournalIndex.tsx src/app/icon.tsx src/app/apple-icon.tsx src/app/journal/page.tsx 'src/app/journal/[slug]/page.tsx' 'src/app/journal/[slug]/opengraph-image.tsx' src/app/journal/rss.xml/route.ts src/lib/journal.ts src/app/layout.tsx src/app/sitemap.ts src/app/robots.ts src/app/opengraph-image.tsx
+node node_modules/eslint/bin/eslint.js src/components/brand/ConformalMark.tsx src/components/landing/ConformalLandingPage.tsx src/components/landing/SectionScrollButton.tsx src/components/journal/JournalChrome.tsx src/components/journal/JournalIndex.tsx src/app/icon.tsx src/app/apple-icon.tsx src/app/journal/page.tsx 'src/app/journal/[slug]/page.tsx' 'src/app/journal/[slug]/opengraph-image.tsx' src/app/journal/rss.xml/route.ts src/lib/journal.ts src/lib/section-scroll.ts src/app/layout.tsx src/app/sitemap.ts src/app/robots.ts src/app/opengraph-image.tsx
 ```
 
 For copy regressions, run:

@@ -3,7 +3,9 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, BadgeCheck, Code, Cpu, History, Lock, ShieldCheck, Target, ToolCase, Users } from "lucide-react";
 import { ConformalMark } from "@/components/brand/ConformalMark";
 import { formatPostDate, posts } from "@/lib/journal";
+import { sectionTargetFromHref } from "@/lib/section-scroll";
 import { SelectedWork } from "./SelectedWork";
+import { PendingSectionScroll, SectionScrollButton } from "./SectionScrollButton";
 import { StatsStrip } from "./StatsStrip";
 
 const pillars = [
@@ -143,23 +145,23 @@ const footerColumns = [
   {
     title: "Work",
     links: [
-      { label: "Executive cockpits", href: "#selected-work" },
-      { label: "Agentic workflows", href: "#selected-work" },
-      { label: "Data product audits", href: "#selected-work" },
+      { label: "Executive cockpits", targetId: "selected-work" },
+      { label: "Agentic workflows", targetId: "selected-work" },
+      { label: "Data product audits", targetId: "selected-work" },
     ],
   },
   {
     title: "Company",
     links: [
-      { label: "Approach", href: "#approach" },
+      { label: "Approach", targetId: "approach" },
       { label: "Journal", href: "/journal" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Trust & security", href: "#trust" },
-      { label: "FAQ", href: "#faq" },
+      { label: "Trust & security", targetId: "trust" },
+      { label: "FAQ", targetId: "faq" },
       { label: "RSS", href: "/journal/rss.xml" },
     ],
   },
@@ -167,7 +169,7 @@ const footerColumns = [
     title: "Contact",
     links: [
       { label: "hello@conformal.live", href: "mailto:hello@conformal.live" },
-      { label: "Gurugram · San Francisco", href: "#conversation" },
+      { label: "Gurugram · San Francisco", targetId: "conversation" },
     ],
   },
 ] as const;
@@ -198,23 +200,39 @@ function buttonClassName(variant: "primary" | "ghost", className?: string) {
   );
 }
 
-function Button({ children, variant = "primary", className, href = "#conversation" }: { children: ReactNode; variant?: "primary" | "ghost"; className?: string; href?: string }) {
+function Button({ children, variant = "primary", className, href, targetId }: { children: ReactNode; variant?: "primary" | "ghost"; className?: string; href?: string; targetId?: string }) {
+  const sectionTarget = targetId ?? (href ? sectionTargetFromHref(href) : "conversation");
+
+  if (sectionTarget) {
+    return (
+      <SectionScrollButton className={buttonClassName(variant, className)} targetId={sectionTarget}>
+        {children}
+      </SectionScrollButton>
+    );
+  }
+
   return (
     <a
       className={buttonClassName(variant, className)}
-      href={href}
+      href={href ?? "/"}
     >
       {children}
     </a>
   );
 }
 
-function SmartLink({ children, className, href }: { children: ReactNode; className?: string; href: string }) {
-  if (href.startsWith("/") && !href.endsWith(".xml")) {
+function SmartLink({ children, className, href, targetId }: { children: ReactNode; className?: string; href?: string; targetId?: string }) {
+  const sectionTarget = targetId || (href ? sectionTargetFromHref(href) : null);
+
+  if (sectionTarget) {
+    return <SectionScrollButton className={className} targetId={sectionTarget}>{children}</SectionScrollButton>;
+  }
+
+  if (href && href.startsWith("/") && !href.endsWith(".xml")) {
     return <Link className={className} href={href}>{children}</Link>;
   }
 
-  return <a className={className} href={href}>{children}</a>;
+  return <a className={className} href={href ?? "/"}>{children}</a>;
 }
 
 function Divider({ children, className }: { children: ReactNode; className?: string }) {
@@ -472,16 +490,17 @@ function FAQSection() {
 export function ConformalLandingPage() {
   return (
     <main className="conformal-landing min-h-screen bg-[color:var(--background)] px-0 py-0 text-[color:var(--foreground)] md:px-8 md:py-8">
+      <PendingSectionScroll />
       <div className="conformal-frame overflow-hidden border-y border-[color:var(--line)] bg-[color:var(--panel)] md:rounded-lg md:border">
         <nav className="conformal-nav flex items-center justify-between gap-6 border-b border-[color:var(--line)] px-5 py-4 md:px-9" aria-label="Primary">
           <div className="flex items-center gap-8">
-            <a className="conformal-brand flex items-center gap-[9px] text-sm font-medium tracking-normal text-[color:var(--foreground)] no-underline" href="#top">
+            <SectionScrollButton className="conformal-brand flex items-center gap-[9px] text-sm font-medium tracking-normal text-[color:var(--foreground)] no-underline" targetId="top">
               <BrandMark />
               <span>conformal</span>
-            </a>
+            </SectionScrollButton>
             <div className="hidden items-center gap-8 md:flex">
-              <a className="conformal-nav-link text-[13px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href="#approach">Approach</a>
-              <a className="conformal-nav-link text-[13px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href="#selected-work">Work</a>
+              <SectionScrollButton className="conformal-nav-link text-[13px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" targetId="approach">Approach</SectionScrollButton>
+              <SectionScrollButton className="conformal-nav-link text-[13px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" targetId="selected-work">Work</SectionScrollButton>
               <Link className="conformal-nav-link text-[13px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href="/journal">Journal</Link>
             </div>
           </div>
@@ -506,7 +525,7 @@ export function ConformalLandingPage() {
             <Button className="px-[18px] py-[11px]">
               Start a conversation <ArrowRight size={14} aria-hidden="true" />
             </Button>
-            <Button variant="ghost" className="px-[18px] py-[11px]" href="#approach">
+            <Button variant="ghost" className="px-[18px] py-[11px]" targetId="approach">
               How we work
             </Button>
           </div>
@@ -610,7 +629,7 @@ export function ConformalLandingPage() {
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-[color:var(--muted)]">{title}</p>
                   {links.map((item) => (
                     <p key={item.label} className="mb-1.5 text-[13px] text-[color:var(--muted)] last:mb-0">
-                      <SmartLink className="text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href={item.href}>{item.label}</SmartLink>
+                      <SmartLink className="text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href={"href" in item ? item.href : undefined} targetId={"targetId" in item ? item.targetId : undefined}>{item.label}</SmartLink>
                     </p>
                   ))}
                 </div>
@@ -622,7 +641,7 @@ export function ConformalLandingPage() {
             <div className="flex gap-[18px]">
               <span className="text-[11px] text-[color:var(--muted)]">Privacy</span>
               <span className="text-[11px] text-[color:var(--muted)]">Terms</span>
-              <a className="text-[11px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" href="#trust">Security</a>
+              <SectionScrollButton className="text-[11px] text-[color:var(--muted)] no-underline hover:text-[color:var(--foreground)]" targetId="trust">Security</SectionScrollButton>
             </div>
           </div>
         </footer>

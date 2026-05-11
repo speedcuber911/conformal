@@ -1,64 +1,42 @@
-name: Deploy
+name: Website CI
 
 on:
   push:
+    branches:
+      - main
+  pull_request:
     branches:
       - main
   workflow_dispatch:
 
 jobs:
   validate:
+    name: Validate Next.js site
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
       - run: pnpm lint
       - run: pnpm build
 
-  deploy:
+  amplify-deploy:
+    name: Amplify deploy handoff
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
-    concurrency:
-      group: dcmshriram-production
-      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure SSH
+      - name: Confirm Amplify auto-deploy
         run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
-          chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
-
-      - name: Sync app to EC2
-        run: |
-          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" 'mkdir -p /home/ubuntu/partner-apps/dcmshriram'
-          rsync -az --delete \
-            --exclude '.git' \
-            --exclude '.next' \
-            --exclude 'node_modules' \
-            --exclude '.env' \
-            --exclude '.env.*' \
-            -e "ssh -i ~/.ssh/ec2_key" \
-            ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/partner-apps/dcmshriram/"
-
-      - name: Verify EC2 runtime env
-        run: |
-          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-            'test -r /etc/leap.env && \
-             grep -q "^ECEO_BACKEND_URL=" /etc/leap.env && \
-             grep -q "^ECEO_BACKEND_REQUIRED=1" /etc/leap.env && \
-             grep -q "^LLM_PROVIDER=" /etc/leap.env && \
-             grep -q "^AZURE_OPENAI_ENDPOINT=" /etc/leap.env && \
-             grep -q "^AZURE_OPENAI_API_KEY=" /etc/leap.env'
-
-      - name: Restart app
-        run: |
-          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-            'cd /home/ubuntu/partner-apps/dcmshriram && bash scripts/deploy-ec2.sh'
+          echo "conformal.live deploys from AWS Amplify Hosting."
+          echo "Amplify app: dlwwm3b70gv88"
+          echo "Branch: main"
+          echo "Build spec: amplify.yml"
+          echo "The connected Amplify branch starts its production build automatically for this push."

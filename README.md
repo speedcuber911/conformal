@@ -44,6 +44,8 @@ Public Conformal routes:
 - Build spec: `amplify.yml`
 - Custom domain: `conformal.live`
 
+Pushes to `main` now run GitHub Actions validation and then Amplify rebuilds and deploys the site automatically from the connected branch. The GitHub workflow no longer deploys the public site through EC2.
+
 The EC2/nginx path is still used for `dcmshriram.conformal.live`, not for the public Conformal landing page.
 
 ## Learn More
@@ -55,24 +57,25 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## CI/CD
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The public site pipeline is split cleanly:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- GitHub Actions validates `main` and pull requests with `pnpm install --frozen-lockfile`, `pnpm exec tsc --noEmit`, `pnpm lint`, and `pnpm build`.
+- AWS Amplify Hosting is connected to `main` and performs the production build/deploy with `amplify.yml`.
+- EC2 deploy scripts are only for the older analytics cockpit/demo surface on `dcmshriram.conformal.live`.
 
 ## Production
 
-Production runs on the shared ap-south-1 EC2 host behind the existing Dockerized nginx edge:
+The public production site runs on Amplify:
 
 - URL: https://conformal.live
-- App path: `/home/ubuntu/partner-apps/conformal`
-- Container: `partner-conformal`
-- Docker network: `cutcompanion_default`
-- Edge config reference: `deploy/nginx.conformal.conf`
+- Amplify app ID: `dlwwm3b70gv88`
+- Amplify region: `ap-south-1`
+- Branch: `main`
 - RSS feed: https://conformal.live/journal/rss.xml
 
-Pushes to `main` run `.github/workflows/deploy.yml`, validate with `pnpm lint` and `pnpm build`, sync the app to EC2, rebuild the app container, and reload nginx.
+The EC2 host remains available for the internal demo runtime at `dcmshriram.conformal.live`.
 
 ### Azure OpenAI agent runtime
 
