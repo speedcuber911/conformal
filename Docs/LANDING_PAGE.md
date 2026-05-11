@@ -65,6 +65,8 @@ The public nav is:
 
 The landing page lives under `src/components/landing/`.
 
+The shared Conformal mark lives in `src/components/brand/ConformalMark.tsx`.
+
 ### `ConformalLandingPage.tsx`
 
 Top-level public home page shell. It owns:
@@ -212,6 +214,17 @@ All article bodies should remain 700-1,400 words. Stubs, lorem ipsum, and placeh
 
 Each journal post exports metadata from `generateMetadata()` and has a post-level generated Open Graph image.
 
+## Logo And App Icons
+
+The Conformal mark is a black rounded square with a white open `C` contour and a red trace/chevron. It is intentionally compact so it holds up as:
+
+- nav/footer brand mark,
+- favicon,
+- Apple touch icon,
+- Open Graph brand stamp.
+
+Do not revert it to the old dot-in-square placeholder. Use `ConformalMark` for in-app surfaces and keep `src/app/icon.tsx`, `src/app/apple-icon.tsx`, `src/app/opengraph-image.tsx`, and `src/app/journal/[slug]/opengraph-image.tsx` visually aligned with that mark.
+
 `src/app/journal/rss.xml/route.ts` returns a RSS 2.0 feed with all journal posts.
 
 `src/app/sitemap.ts` includes home, `/journal`, and every journal post.
@@ -247,7 +260,7 @@ Use these checks after landing-page or journal edits:
 
 ```bash
 node node_modules/typescript/bin/tsc --noEmit
-node node_modules/eslint/bin/eslint.js src/components/landing/ConformalLandingPage.tsx src/components/journal/JournalChrome.tsx src/components/journal/JournalIndex.tsx src/app/journal/page.tsx 'src/app/journal/[slug]/page.tsx' 'src/app/journal/[slug]/opengraph-image.tsx' src/app/journal/rss.xml/route.ts src/lib/journal.ts src/app/layout.tsx src/app/sitemap.ts src/app/robots.ts src/app/opengraph-image.tsx
+node node_modules/eslint/bin/eslint.js src/components/brand/ConformalMark.tsx src/components/landing/ConformalLandingPage.tsx src/components/journal/JournalChrome.tsx src/components/journal/JournalIndex.tsx src/app/icon.tsx src/app/apple-icon.tsx src/app/journal/page.tsx 'src/app/journal/[slug]/page.tsx' 'src/app/journal/[slug]/opengraph-image.tsx' src/app/journal/rss.xml/route.ts src/lib/journal.ts src/app/layout.tsx src/app/sitemap.ts src/app/robots.ts src/app/opengraph-image.tsx
 ```
 
 For copy regressions, run:

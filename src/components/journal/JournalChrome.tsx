@@ -1,17 +1,14 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { ConformalMark } from "@/components/brand/ConformalMark";
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
 function BrandMark() {
-  return (
-    <div className="conformal-brand-mark flex h-5 w-5 items-center justify-center rounded-[5px] bg-[#0E0E0E]" aria-hidden="true">
-      <div className="h-[9px] w-[9px] rounded-full bg-white" />
-    </div>
-  );
+  return <ConformalMark className="conformal-brand-mark shrink-0" size={20} />;
 }
 
 function buttonClassName(className?: string) {

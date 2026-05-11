@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, BadgeCheck, Code, Cpu, History, Lock, ShieldCheck, Target, ToolCase, Users } from "lucide-react";
+import { ConformalMark } from "@/components/brand/ConformalMark";
 import { formatPostDate, posts } from "@/lib/journal";
 import { SelectedWork } from "./SelectedWork";
 import { StatsStrip } from "./StatsStrip";
@@ -74,12 +75,12 @@ const beliefs = [
 ] as const;
 
 const trustCards = [
-  { icon: ShieldCheck, title: "Deploys inside your environment", body: "Your cloud, your tenancy, or on-prem. Data stays inside the security envelope your team approves." },
+  { icon: ShieldCheck, title: "Deploys inside your VPC", body: "AWS, Azure, GCP, or on-prem. No data egress except to the LLM provider you choose." },
   { icon: Lock, title: "SOC 2 Type II in progress", body: "Security controls are being formalized now, with a Q3 2026 Type II target. Current controls shared under NDA." },
   { icon: History, title: "Full audit trail", body: "Every prompt, tool call, SQL query, and answer logged with timestamps, cost, and trace IDs." },
   { icon: BadgeCheck, title: "DPIA & DPA ready", body: "Standard data processing agreements and impact assessments — signed within a week, not a quarter." },
   { icon: Code, title: "Source code escrow", body: "All code is your code from day one. Repo in your GitHub org, commits attributed to your engineers." },
-  { icon: Cpu, title: "Model-provider neutral", body: "We build against the model contract you choose, keep the switching surface explicit, and do not take a margin on inference." },
+  { icon: Cpu, title: "Model-provider neutral", body: "Anthropic, OpenAI, Azure OpenAI, open-weight. You pick, you pay the provider, you switch when you want." },
 ] as const;
 
 const founderEng = {
@@ -88,7 +89,7 @@ const founderEng = {
   credentials: [
     {
       label: "Now",
-      value: "VP Engineering at an AI-native education company. Architects multimodal agent systems across speech, reasoning, and realtime delivery.",
+      value: "VP Engineering at an AI-native education company. Architects multimodal LLM systems — STT, reasoning, TTS at sub-second latency.",
     },
     {
       label: "Recently",
@@ -96,15 +97,15 @@ const founderEng = {
     },
     {
       label: "Before",
-      value: "Senior engineer at a large consumer-tech company — built core payments. Co-founded two startups, one of which processed *100K+ monthly orders*.",
+      value: "Senior engineer at Amazon — built core payments. Co-founded two startups, one of which processed *100K+ monthly orders*.",
     },
     {
       label: "Shipped",
-      value: "Enterprise app marketplace launches, agentic workflows, retrieval systems, and secure production platforms.",
+      value: "Microsoft Teams App Store apps, agentic AI bots, RAG pipelines, serverless platforms on AWS. A Microsoft App Store launch.",
     },
     {
       label: "Trained at",
-      value: "Chemical engineering training. Self-taught everything after.",
+      value: "BITS Pilani, Chemical Engineering. Self-taught everything after.",
     },
   ],
 };
@@ -131,29 +132,29 @@ const founderStrat = {
     },
     {
       label: "Trained at",
-      value: "Business-school MBA. Engineering undergrad. Bilingual analyst before joining tech.",
+      value: "The Wharton School (MBA). BITS Pilani, B.E. Hons. Bilingual analyst before joining tech.",
     },
   ],
 };
 
 const combinedAchievements = [
   "Built platforms used by 600K+ users",
-  "Shipped enterprise marketplace apps",
+  "Shipped on the Microsoft App Store",
   "Invested across 3 venture funds",
-  "Advised 4 top-tier transformation programs",
+  "Advised 4 BCG transformation programs",
   "Founded 4 companies",
   "Hired 200+ engineers and analysts",
-  "Trained across engineering, business, and operating roles",
+  "Trained at BITS Pilani · Wharton · Amazon · BCG",
 ] as const;
 
 const faqs = [
   {
-    q: "How is this different from hiring a strategy consultancy?",
+    q: "How is this different from hiring McKinsey or Bain?",
     a: "They write the roadmap. We build the thing the roadmap calls for. Both have a place — but the bottleneck inside most enterprises today is execution, not strategy. We don't compete with them; we ship what they recommend.",
   },
   {
-    q: "Do you work with a specific model provider?",
-    a: "We're model-neutral. We deploy what fits your security envelope and budget. The provider contract is between you and them; we don't take a margin on inference.",
+    q: "Do you work with a specific LLM provider?",
+    a: "We're model-neutral. Anthropic Claude, OpenAI GPT, Azure OpenAI, open-weight models on your own GPUs — we'll deploy what fits your security envelope and your budget. The provider contract is between you and them; we don't take a margin on inference.",
   },
   {
     q: "What does an engagement cost?",
@@ -219,11 +220,7 @@ function Reveal({ children, className, ...props }: ComponentProps<"div">) {
 }
 
 function BrandMark() {
-  return (
-    <div className="conformal-brand-mark flex h-5 w-5 items-center justify-center rounded-[5px] bg-[#0E0E0E]" aria-hidden="true">
-      <div className="h-[9px] w-[9px] rounded-full bg-white" />
-    </div>
-  );
+  return <ConformalMark className="conformal-brand-mark shrink-0" size={20} />;
 }
 
 function buttonClassName(variant: "primary" | "ghost", className?: string) {

@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { ConformalMark } from "@/components/brand/ConformalMark";
 
 export const alt = "Conformal";
 export const size = {
@@ -34,19 +35,7 @@ export default function Image() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 9,
-                background: "#0E0E0E",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <div style={{ width: 15, height: 15, borderRadius: 999, background: "#FFFFFF" }} />
-            </div>
+            <ConformalMark size={36} />
             <div style={{ fontSize: 26, fontWeight: 500 }}>conformal</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 860 }}>
