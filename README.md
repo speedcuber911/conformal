@@ -44,7 +44,7 @@ Public Conformal routes:
 - Build spec: `amplify.yml`
 - Custom domain: `conformal.live`
 
-Pushes to `main` now run GitHub Actions validation and then Amplify rebuilds and deploys the site automatically from the connected branch. The GitHub workflow no longer deploys the public site through EC2.
+Pushes to `main` deploy both production surfaces from the same commit: Amplify rebuilds and deploys `conformal.live`, while GitHub Actions syncs and restarts the EC2-hosted demo at `dcmshriram.conformal.live`.
 
 The EC2/nginx path is still used for `dcmshriram.conformal.live`, not for the public Conformal landing page.
 
@@ -59,11 +59,11 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## CI/CD
 
-The public site pipeline is split cleanly:
+The production pipeline is split cleanly:
 
-- GitHub Actions validates `main` and pull requests with `pnpm install --frozen-lockfile`, `pnpm exec tsc --noEmit`, `pnpm lint`, and `pnpm build`.
-- AWS Amplify Hosting is connected to `main` and performs the production build/deploy with `amplify.yml`.
-- EC2 deploy scripts are only for the older analytics cockpit/demo surface on `dcmshriram.conformal.live`.
+- GitHub Actions validates `main` and pull requests with install, TypeScript, lint, the Conformal build, the DCM demo build, and Docker Compose config checks.
+- AWS Amplify Hosting is connected to `main` and performs the `conformal.live` production build/deploy with `amplify.yml`.
+- The same GitHub Actions run deploys the DCM demo to EC2 at `dcmshriram.conformal.live` after validation succeeds.
 
 ## Production
 
@@ -108,7 +108,7 @@ AZURE_OPENAI_TIMEOUT_MS=14000
 AZURE_OPENAI_MAX_OUTPUT_TOKENS=1200
 ```
 
-Production deploys source `/etc/conformal.env` before `docker compose`, so keep these values there and never commit secrets.
+The DCM demo deploy sources `/etc/leap.env` before `docker compose`, so keep these values there and never commit secrets.
 
 ### ECEO backend capabilities
 

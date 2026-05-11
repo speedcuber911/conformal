@@ -11,7 +11,7 @@ on:
 
 jobs:
   validate:
-    name: Validate Next.js site
+    name: Validate both site variants
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,10 +25,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec tsc --noEmit
       - run: pnpm lint
-      - run: pnpm build
+      - name: Build Conformal public site
+        run: SITE_VARIANT=conformal NEXT_PUBLIC_SITE_VARIANT=conformal pnpm build
+      - name: Build DCM demo site
+        run: |
+          rm -rf .next
+          SITE_VARIANT=dcmshriram NEXT_PUBLIC_SITE_VARIANT=dcmshriram pnpm build
+      - name: Validate Docker Compose files
+        run: |
+          docker compose -f deploy/docker-compose.dcmshriram.yml config >/dev/null
+          docker compose -f deploy/docker-compose.conformal.yml config >/dev/null
 
   amplify-deploy:
-    name: Amplify deploy handoff
+    name: Deploy Conformal via Amplify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ubuntu-latest
@@ -40,3 +49,51 @@ jobs:
           echo "Branch: main"
           echo "Build spec: amplify.yml"
           echo "The connected Amplify branch starts its production build automatically for this push."
+
+  deploy-demo-ec2:
+    name: Deploy DCM demo to EC2
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dcmshriram-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync DCM demo source to EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" 'mkdir -p /home/ubuntu/partner-apps/dcmshriram'
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.next' \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            -e "ssh -i ~/.ssh/ec2_key" \
+            ./ "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/ubuntu/partner-apps/dcmshriram/"
+
+      - name: Verify DCM runtime env
+        run: |
+          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            'test -r /etc/leap.env && \
+             grep -q "^ECEO_BACKEND_URL=" /etc/leap.env && \
+             grep -q "^ECEO_BACKEND_REQUIRED=1" /etc/leap.env && \
+             grep -q "^LLM_PROVIDER=" /etc/leap.env && \
+             grep -q "^AZURE_OPENAI_ENDPOINT=" /etc/leap.env && \
+             grep -q "^AZURE_OPENAI_API_KEY=" /etc/leap.env'
+
+      - name: Restart DCM demo containers
+        run: |
+          ssh -i ~/.ssh/ec2_key "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            'cd /home/ubuntu/partner-apps/dcmshriram && APP_NAME=dcmshriram DEPLOY_PATH=/home/ubuntu/partner-apps/dcmshriram COMPOSE_FILE=deploy/docker-compose.dcmshriram.yml bash scripts/deploy-ec2.sh'
+
+      - name: Verify public DCM demo health
+        run: curl -fsS https://dcmshriram.conformal.live/api/health

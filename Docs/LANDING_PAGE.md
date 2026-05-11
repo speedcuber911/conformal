@@ -260,7 +260,7 @@ The public Conformal site is hosted on AWS Amplify Hosting, connected to the Git
 - Amplify branch: `main`
 - Build spec: `amplify.yml`
 
-GitHub Actions now runs `.github/workflows/deploy.yml` as website CI only: install, TypeScript, lint, and build. The deploy step is the Amplify GitHub integration, which starts a production build automatically after a successful push to `main`.
+GitHub Actions runs `.github/workflows/deploy.yml` for shared validation and the EC2 demo deploy. The Conformal deploy step is the Amplify GitHub integration, which starts a production build automatically on pushes to `main`; the DCM demo deploy step syncs the same commit to EC2 and restarts `dcmshriram.conformal.live`.
 
 Route53 keeps the apex `conformal.live` as an alias to the Amplify-managed CloudFront target. The `dcmshriram.conformal.live` record remains on EC2 for the analytics cockpit/demo runtime.
 

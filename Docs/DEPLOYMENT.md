@@ -6,20 +6,17 @@ This repo deploys two production surfaces from the same source tree. They must r
 
 ```text
 Route53
-  conformal.live                 -> 13.206.15.163
+  conformal.live                 -> Amplify-managed CloudFront
   dcmshriram.conformal.live       -> 13.206.15.163
+
+AWS Amplify Hosting
+  app dlwwm3b70gv88, branch main
+    -> conformal.live
 
 EC2 host
   cut-nginx
-    server_name conformal.live
-      -> http://conformal-live:3000
-
     server_name dcmshriram.conformal.live
       -> http://partner-dcmshriram:3000
-
-  conformal-live
-    Next.js standalone production build
-    SITE_VARIANT=conformal
 
   partner-dcmshriram
     Next.js standalone production build
@@ -29,7 +26,7 @@ EC2 host
     FastAPI ECEO sidecar for the DCM demo
 ```
 
-The nginx edge is the existing Dockerized `cut-nginx` container on the `cutcompanion_default` network. It terminates TLS using the Let's Encrypt certificates mounted into that container.
+The nginx edge is the existing Dockerized `cut-nginx` container on the `cutcompanion_default` network. It terminates TLS for the DCM demo using the Let's Encrypt certificates mounted into that container. The public Conformal site is no longer served from this EC2/nginx path during normal operation.
 
 ## Build Variants
 
@@ -48,24 +45,23 @@ Do not run `pnpm dev`, `next dev`, or `next start` in production.
 
 ## GitHub Actions
 
-`.github/workflows/deploy.yml` runs on pushes to `main` and on manual dispatch.
+`.github/workflows/deploy.yml` runs on pushes to `main`, pull requests to `main`, and manual dispatch.
 
 Validation:
 
 1. Install dependencies with pnpm.
-2. Run `pnpm lint`.
-3. Build `SITE_VARIANT=conformal`.
-4. Build `SITE_VARIANT=dcmshriram`.
-5. Validate both Docker Compose files.
+2. Run TypeScript and lint checks.
+3. Build `SITE_VARIANT=conformal` for the public site.
+4. Build `SITE_VARIANT=dcmshriram` for the demo.
+5. Validate the Docker Compose files.
 
 Deployment:
 
-1. Sync source to `/home/ubuntu/partner-apps/conformal`.
-2. Run `scripts/deploy-conformal-ec2.sh`.
-3. Verify the DCM runtime env exists in `/etc/leap.env`.
-4. Sync source to `/home/ubuntu/partner-apps/dcmshriram`.
-5. Run `scripts/deploy-ec2.sh`.
-6. Verify public and internal health checks for both domains.
+1. Amplify automatically rebuilds and deploys `conformal.live` from the pushed `main` commit.
+2. GitHub Actions verifies the DCM runtime env exists in `/etc/leap.env`.
+3. GitHub Actions syncs source to `/home/ubuntu/partner-apps/dcmshriram`.
+4. GitHub Actions runs `scripts/deploy-ec2.sh`.
+5. GitHub Actions verifies the public DCM health check.
 
 Required GitHub secrets:
 
@@ -75,12 +71,10 @@ Required GitHub secrets:
 
 ## Manual Deploy
 
-Conformal landing:
+Conformal landing deploys through Amplify. For a manual rebuild from local AWS CLI:
 
 ```bash
-rsync -az --delete --exclude '.git' --exclude '.next' --exclude 'node_modules' ./ \
-  ubuntu@13.206.15.163:/home/ubuntu/partner-apps/conformal/
-ssh ubuntu@13.206.15.163 'cd /home/ubuntu/partner-apps/conformal && bash scripts/deploy-conformal-ec2.sh'
+aws amplify start-job --app-id dlwwm3b70gv88 --branch-name main --job-type RELEASE --region ap-south-1
 ```
 
 DCM demo:
@@ -99,7 +93,6 @@ curl -kfsS https://dcmshriram.conformal.live/api/health
 
 ssh ubuntu@13.206.15.163 '
   docker exec cut-nginx nginx -t &&
-  docker exec cut-nginx wget -qO- http://conformal-live:3000/api/health &&
   docker exec cut-nginx wget -qO- http://partner-dcmshriram:3000/api/health &&
   docker exec partner-dcmshriram wget -qO- http://partner-dcmshriram-backend:8000/health
 '
