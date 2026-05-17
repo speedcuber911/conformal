@@ -2882,7 +2882,7 @@ textarea:focus-visible {
   .mobile-tabbar {
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 6px;
     margin: 0 16px max(10px, env(safe-area-inset-bottom));
     border: 1px solid rgba(216, 212, 206, 0.86);
@@ -2908,6 +2908,7 @@ textarea:focus-visible {
     font-size: 11px;
     font-weight: 750;
     letter-spacing: 0.01em;
+    text-decoration: none;
     transition: background 160ms ease, color 160ms ease, transform 160ms ease;
   }
 

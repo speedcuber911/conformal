@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SFS Data Discovery Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root, :root[data-theme="light"] {
+    --bg: #fafaf7;
+    --bg-elev: #ffffff;
+    --bg-elev-2: #f3f3ee;
+    --panel: #f6f6f1;
+    --border: #e4e4dc;
+    --border-strong: #cdcdc2;
+    --text: #1a1a1f;
+    --text-dim: #525868;
+    --text-faint: #8a8f9c;
+    --accent: #b88a00;
+    --link: rgba(60,68,90,0.32);
+    --link-strong: rgba(184,138,0,0.95);
+    --grid-line: rgba(0,0,0,0.025);
+    --node-stroke: #ffffff;
+    --label-stroke: #fafaf7;
+    --inner-text: rgba(255,255,255,0.95);
+
+    /* Themes (use cases) */
+    --theme-procurement: #d97706;
+    --theme-field: #059669;
+    --theme-enterprise: #7c3aed;
+    --theme-logistics: #b45309;
+    --theme-tech: #2563eb;
+
+    /* Source Groups (data fields) */
+    --src-sap: #fb923c;
+    --src-internal: #4ade80;
+    --src-logistics: #c084fc;
+    --src-risk: #f87171;
+    --src-market: #38bdf8;
+    --src-voice: #f472b6;
+    --src-computed: #94a3b8;
+
+    /* Availability */
+    --av-available: #22c55e;
+    --av-partial: #facc15;
+    --av-unavailable: #ef4444;
+    --av-tbc: #64748b;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0b0d12;
+    --bg-elev: #11141b;
+    --bg-elev-2: #161a23;
+    --panel: #0f1218;
+    --border: #1f2330;
+    --border-strong: #2a3041;
+    --text: #e6e8ee;
+    --text-dim: #9ca3b3;
+    --text-faint: #5d6478;
+    --accent: #f5d76e;
+    --link: rgba(180,190,210,0.36);
+    --link-strong: rgba(245,215,110,0.85);
+    --grid-line: rgba(255,255,255,0.014);
+    --node-stroke: var(--bg);
+    --label-stroke: var(--bg);
+    --inner-text: rgba(0,0,0,0.7);
+
+    /* Themes (use cases) */
+    --theme-procurement: #f59e0b;
+    --theme-field: #34d399;
+    --theme-enterprise: #a78bfa;
+    --theme-logistics: #d97706;
+    --theme-tech: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: "DM Sans", system-ui, sans-serif; overflow: hidden; }
+
+  /* Subtle grid texture */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none; z-index: 0;
+  }
+
+  .app { display: grid; grid-template-columns: 320px 1fr 360px; grid-template-rows: 56px 1fr; height: 100vh; position: relative; z-index: 1; }
+  @media (max-width: 1100px) { .app { grid-template-columns: 280px 1fr; } .panel-right { display: none; } }
+
+  /* === Top bar === */
+  .topbar {
+    grid-column: 1 / -1; grid-row: 1;
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--panel) 70%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .logo {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--bg-elev);
+  }
+  .logo span { color: var(--accent); }
+  .title {
+    font-family: "DM Sans", sans-serif;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.01em;
+  }
+  .title .subtitle { color: var(--text-faint); font-weight: 400; margin-left: 8px; font-size: 12px; }
+  .topbar .spacer { flex: 1; }
+  .search {
+    position: relative;
+    width: 280px;
+  }
+  .search input {
+    width: 100%;
+    padding: 8px 12px 8px 32px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent); }
+  .search::before {
+    content: ""; position: absolute; left: 11px; top: 50%; width: 12px; height: 12px;
+    transform: translateY(-50%);
+    border: 1.5px solid var(--text-faint); border-radius: 50%;
+  }
+  .search::after {
+    content: ""; position: absolute; left: 20px; top: 22px;
+    width: 5px; height: 1.5px; background: var(--text-faint);
+    transform: rotate(45deg); transform-origin: left;
+  }
+  .stats { display: flex; gap: 14px; }
+  .stat { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--text-dim); }
+  .stat b { color: var(--text); font-weight: 600; margin-left: 4px; }
+
+  /* Theme toggle */
+  .theme-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color .12s, border-color .12s, background .12s;
+  }
+  .theme-toggle:hover { color: var(--text); border-color: var(--text-faint); }
+  .theme-toggle .ico {
+    width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center;
+  }
+
+  /* === Left panel === */
+  .panel-left {
+    grid-row: 2; grid-column: 1;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    overflow-y: auto;
+    padding: 16px 14px 80px;
+  }
+  .panel-right {
+    grid-row: 2; grid-column: 3;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    overflow-y: auto;
+    padding: 18px 18px 60px;
+  }
+  .filter-section { margin-bottom: 18px; }
+  .filter-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .filter-title {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .filter-clear {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; color: var(--text-faint);
+    background: none; border: none; cursor: pointer;
+    padding: 0;
+  }
+  .filter-clear:hover { color: var(--accent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 8px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 11px; color: var(--text-dim);
+    cursor: pointer;
+    transition: all .12s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--text-faint); color: var(--text); }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .chip .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--swatch, #555);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--text) 8%, transparent);
+  }
+  .chip.active .dot { box-shadow: 0 0 0 1.5px var(--bg); }
+
+  .select {
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-strong);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: "DM Sans", sans-serif;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+  }
+  .select:focus { border-color: var(--accent); }
+
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .switch {
+    width: 28px; height: 16px; background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong); border-radius: 999px;
+    position: relative; cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .switch::after {
+    content: ""; position: absolute; left: 2px; top: 1px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--text-dim); transition: left .15s, background .15s;
+  }
+  .switch.on { background: var(--accent); border-color: var(--accent); }
+  .switch.on::after { left: 14px; background: var(--bg); }
+
+  /* === Graph === */
+  .graph-wrap {
+    grid-row: 2; grid-column: 2;
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 30% 20%, color-mix(in oklab, var(--accent) 8%, transparent) 0%, transparent 50%),
+      radial-gradient(ellipse at 70% 80%, color-mix(in oklab, var(--theme-tech) 8%, transparent) 0%, transparent 50%),
+      var(--bg);
+  }
+  #graph { width: 100%; height: 100%; cursor: grab; }
+  #graph:active { cursor: grabbing; }
+
+  .legend {
+    position: absolute; left: 14px; bottom: 14px;
+    background: color-mix(in oklab, var(--bg) 72%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 11px;
+    max-width: 320px;
+  }
+  .legend-section + .legend-section { margin-top: 10px; }
+  .legend-title {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-faint); margin-bottom: 6px;
+  }
+  .legend-items { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
+  .legend-item .swatch {
+    width: 9px; height: 9px; border-radius: 50%;
+  }
+  .legend-item .swatch.square { border-radius: 2px; }
+
+  .controls {
+    position: absolute; right: 14px; top: 14px;
+    display: flex; flex-direction: column; gap: 4px;
+    background: color-mix(in oklab, var(--bg) 72%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px;
+  }
+  .ctrl {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .ctrl:hover { background: var(--bg-elev); color: var(--text); border-color: var(--border-strong); }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong);
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    color: var(--text);
+    box-shadow: 0 8px 24px color-mix(in oklab, var(--text) 18%, transparent);
+    opacity: 0;
+    transition: opacity .12s;
+    max-width: 260px;
+    z-index: 20;
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip .ttitle { font-weight: 600; font-size: 12px; margin-bottom: 3px; }
+  .tooltip .tmeta { color: var(--text-faint); font-family: "JetBrains Mono", monospace; font-size: 10px; }
+
+  /* === Right panel: detail === */
+  .panel-empty {
+    color: var(--text-faint); font-size: 12px;
+    text-align: center; padding: 60px 12px;
+    font-family: "JetBrains Mono", monospace;
+    letter-spacing: 0.05em;
+  }
+  .detail-type {
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    margin-bottom: 10px;
+  }
+  .detail-type.usecase { background: color-mix(in oklab, var(--accent) 18%, transparent); color: var(--accent); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+  .detail-type.field { background: color-mix(in oklab, var(--theme-tech) 18%, transparent); color: var(--theme-tech); border: 1px solid color-mix(in oklab, var(--theme-tech) 35%, transparent); }
+  .detail-title {
+    font-size: 18px; font-weight: 600; line-height: 1.25;
+    margin: 0 0 12px;
+  }
+  .detail-headline {
+    font-size: 12px; color: var(--text-dim);
+    line-height: 1.55; margin-bottom: 18px;
+    padding: 10px 12px;
+    background: var(--bg-elev);
+    border-left: 2px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+  }
+  .detail-prop { margin-bottom: 14px; }
+  .detail-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-faint); margin-bottom: 5px;
+  }
+  .detail-value { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .detail-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  .detail-tag.themed { color: var(--bg); font-weight: 500; border: none; }
+  .detail-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .detail-section-title {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 10px;
+  }
+  .connected-list { display: flex; flex-direction: column; gap: 3px; max-height: 260px; overflow-y: auto; }
+  .connected-item {
+    padding: 7px 10px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    transition: all .12s;
+  }
+  .connected-item:hover { background: var(--bg-elev-2); border-color: var(--border-strong); }
+  .connected-item .swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .connected-item .name { flex: 1; color: var(--text); }
+  .connected-item .meta { color: var(--text-faint); font-family: "JetBrains Mono", monospace; font-size: 10px; }
+
+  /* Availability badge */
+  .av-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+  }
+  .av-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .av-Available { background: color-mix(in oklab, #22c55e 18%, transparent); color: color-mix(in oklab, #22c55e 80%, var(--text)); }
+  .av-Available .dot { background: #22c55e; }
+  .av-Partial { background: color-mix(in oklab, #facc15 22%, transparent); color: color-mix(in oklab, #b45309 80%, var(--text)); }
+  .av-Partial .dot { background: #facc15; }
+  .av-Unavailable { background: color-mix(in oklab, #ef4444 18%, transparent); color: color-mix(in oklab, #ef4444 80%, var(--text)); }
+  .av-Unavailable .dot { background: #ef4444; }
+  .av-TBC { background: color-mix(in oklab, #64748b 22%, transparent); color: color-mix(in oklab, #64748b 70%, var(--text)); }
+  .av-TBC .dot { background: #94a3b8; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+  /* Graph node label */
+  .node-label {
+    font-family: "DM Sans", sans-serif;
+    font-size: 10px;
+    fill: var(--text);
+    pointer-events: none;
+    paint-order: stroke;
+    stroke: var(--label-stroke);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+  }
+  .node-label.large {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+
+  .info-hint {
+    font-size: 11px; color: var(--text-faint);
+    line-height: 1.45;
+    padding: 10px 12px;
+    background: var(--bg-elev);
+    border-radius: 4px;
+    margin-bottom: 16px;
+    border-left: 2px solid var(--border-strong);
+  }
+  .info-hint b { color: var(--text-dim); font-weight: 600; }
+
+  /* Highlighted state via classes set by JS */
+  .node.dim { opacity: 0.12 !important; }
+  .link.dim { opacity: 0.02 !important; }
+  .node.highlight { filter: drop-shadow(0 0 6px rgba(245,215,110,0.8)); }
+  .link.highlight { stroke: var(--link-strong) !important; stroke-opacity: 0.9 !important; }
+  .label.dim { opacity: 0.1 !important; }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="logo">Conformal · <span>SFS</span></div>
+    <div class="title">SFS Data Discovery Graph<span class="subtitle">Use case ↔ data field map</span></div>
+    <div class="spacer"></div>
+    <div class="stats">
+      <span class="stat">Use cases <b id="stat-uc">0</b></span>
+      <span class="stat">Fields <b id="stat-df">0</b></span>
+      <span class="stat">Links <b id="stat-links">0</b></span>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="toggle theme">
+      <span class="ico" id="theme-ico" aria-hidden="true"></span>
+      <span id="theme-label">DARK</span>
+    </button>
+    <div class="search">
+      <input id="search" type="text" placeholder="search nodes…" autocomplete="off">
+    </div>
+  </header>
+
+  <aside class="panel-left">
+    <div class="info-hint">
+      <b>How to use.</b> Click any node for details · hover to focus connections · drag to reposition · scroll to zoom. Filters affect what's visible & dim everything else.
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Theme · Use Cases</span>
+        <button class="filter-clear" data-clear="theme">clear</button>
+      </div>
+      <div class="chips" id="filter-theme"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Source Group · Data Fields</span>
+        <button class="filter-clear" data-clear="sourceGroup">clear</button>
+      </div>
+      <div class="chips" id="filter-sourceGroup"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Availability</span>
+        <button class="filter-clear" data-clear="availability">clear</button>
+      </div>
+      <div class="chips" id="filter-availability"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Format</span>
+        <button class="filter-clear" data-clear="format">clear</button>
+      </div>
+      <div class="chips" id="filter-format"></div>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Primary User Role</span>
+        <button class="filter-clear" data-clear="primaryUser">clear</button>
+      </div>
+      <select class="select" id="filter-primaryUser">
+        <option value="">— any —</option>
+      </select>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Internal System</span>
+        <button class="filter-clear" data-clear="system">clear</button>
+      </div>
+      <select class="select" id="filter-system">
+        <option value="">— any —</option>
+      </select>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header">
+        <span class="filter-title">Data Gap Type</span>
+        <button class="filter-clear" data-clear="gapType">clear</button>
+      </div>
+      <select class="select" id="filter-gapType">
+        <option value="">— any —</option>
+      </select>
+    </div>
+
+    <div class="filter-section">
+      <div class="filter-header"><span class="filter-title">Color Mode</span></div>
+      <select class="select" id="color-mode">
+        <option value="category">Category (theme / source group)</option>
+        <option value="availability">Availability (fields only)</option>
+        <option value="format">Format (fields only)</option>
+      </select>
+    </div>
+
+    <div class="filter-section">
+      <div class="toggle-row">
+        <span>Show field labels</span>
+        <div class="switch" id="toggle-labels"></div>
+      </div>
+      <div class="toggle-row">
+        <span>Highlight shared fields</span>
+        <div class="switch on" id="toggle-shared"></div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="graph-wrap">
+    <svg id="graph"></svg>
+    <div class="tooltip" id="tooltip"></div>
+    <div class="controls">
+      <button class="ctrl" id="zoom-in" title="zoom in">+</button>
+      <button class="ctrl" id="zoom-out" title="zoom out">−</button>
+      <button class="ctrl" id="zoom-reset" title="reset" style="font-size:11px;">⟲</button>
+    </div>
+    <div class="legend">
+      <div class="legend-section">
+        <div class="legend-title">Themes (use cases · squares)</div>
+        <div class="legend-items" id="legend-themes"></div>
+      </div>
+      <div class="legend-section">
+        <div class="legend-title">Source groups (fields · circles)</div>
+        <div class="legend-items" id="legend-sources"></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel-right" id="detail-panel">
+    <div class="panel-empty">SELECT A NODE TO INSPECT</div>
+  </aside>
+</div>
+
+<script>
+window.addEventListener("error", function(e) {
+  const msg = (e.error && (e.error.stack || e.error.message)) || e.message || "unknown error";
+  const box = document.createElement("pre");
+  box.style.cssText = "position:fixed;left:12px;bottom:12px;max-width:80vw;max-height:40vh;overflow:auto;background:#1a0f0f;color:#fda4af;padding:12px 14px;border:1px solid #7f1d1d;border-radius:6px;font:11px/1.4 'JetBrains Mono',monospace;z-index:9999;white-space:pre-wrap;";
+  box.textContent = "Runtime error:\n" + msg;
+  document.body && document.body.appendChild(box);
+});
+if (typeof d3 === "undefined") {
+  document.addEventListener("DOMContentLoaded", function() {
+    const box = document.createElement("pre");
+    box.style.cssText = "position:fixed;left:12px;bottom:12px;max-width:80vw;background:#1a0f0f;color:#fda4af;padding:12px 14px;border:1px solid #7f1d1d;border-radius:6px;font:11px/1.4 'JetBrains Mono',monospace;z-index:9999;";
+    box.textContent = "D3 failed to load from CDN. Check network access.";
+    document.body && document.body.appendChild(box);
+  });
+}
+</script>
+<script>
+const DATA = {"useCases": [{"id": "362c3907-070c-81c5-82fb-e6286a2f112a", "Name": "1. Historical Spend Analysis & Price Insights", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Real-time spend cube (category × vendor × region × time) on 3-year SAP data with BPV-gap and anomaly detection; replaces 3–5 days of quarterly Excel work and gives leadership self-serve analytics", "Primary Users": ["Category Managers", "Procurement Analysts", "Sourcing Managers"], "Secondary Users": ["Business Head (BH)", "Buyers", "CFO", "Supply Chain Head"], "Internal Systems Touched": ["Complinity", "Concur", "Material Master", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "System Integration", "Tagging / Classification", "Taxonomy Build"], "External Data Sources Needed": ["Commodity Price Indices"], "Data Fields": ["362c3907-070c-814b-8094-e7a20dee36bc", "362c3907-070c-8189-942e-f66346533984", "362c3907-070c-81bc-b484-c1d7771d18f0", "362c3907-070c-8141-bd18-f78cb53bbd6d", "362c3907-070c-812e-ad86-e9553adfafb0", "362c3907-070c-8122-8c76-c7f4bcca5cd5", "362c3907-070c-81a1-8ee9-cff5b4559b10", "362c3907-070c-81a9-ae5b-cc2b5637b8df", "362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-810f-b29d-fd0d6905e566", "362c3907-070c-814c-9e8d-d7d0d3e54781", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8124-800c-c177c61c6846", "362c3907-070c-81bc-8da0-fb6bad1b97d6", "362c3907-070c-81a2-8f56-cc5ff9d4909a", "362c3907-070c-8126-b0c0-e407a5a01b5c", "362c3907-070c-810d-bb36-c31af3c038c9", "362c3907-070c-81c2-ae2c-dce226ddd790", "362c3907-070c-81ae-b8e2-cdc4eab3800b", "362c3907-070c-813b-8fb3-dc301d2691e0", "362c3907-070c-81a4-bd3f-dcbc5e6d012c", "362c3907-070c-81b8-bba6-df32203a4595", "362c3907-070c-8176-a713-fc7b39696669", "362c3907-070c-8163-b68a-d9ae22dca7e6", "362c3907-070c-81e5-ace9-d0e127e98dcc", "362c3907-070c-81aa-b571-ffbb657de8b0"]}, {"id": "362c3907-070c-817e-9c08-d74f3d4a2ce2", "Name": "2. Real-Time Import Data Analysis", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Real-time EXIM/customs intelligence dashboard benchmarking SFS purchase prices vs. CIF/landed cost; tracks supplier share, origin pricing dynamics, and pushes weekly alerts on import benchmark deviations and large competitor trades", "Primary Users": ["Buyers", "Category Managers", "Sourcing Managers"], "Secondary Users": ["Procurement Analysts", "Supply Chain Head"], "Internal Systems Touched": ["Material Master", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "External Sourcing", "System Integration", "Tagging / Classification"], "External Data Sources Needed": ["EXIM / Customs Data"], "Data Fields": ["362c3907-070c-8189-942e-f66346533984", "362c3907-070c-812e-ad86-e9553adfafb0", "362c3907-070c-81a1-8ee9-cff5b4559b10", "362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-8152-a780-e7d08d74cbb1", "362c3907-070c-817d-ac3b-eb3e13419153", "362c3907-070c-8174-bac4-e248eabe6841", "362c3907-070c-81c7-a957-e313c4b5dc3e", "362c3907-070c-814b-91fc-defc42c4143b", "362c3907-070c-81f4-97b8-cda8e0af802f", "362c3907-070c-8137-821e-d8e28bd0d18b", "362c3907-070c-813e-94d3-d68d3b1dac35", "362c3907-070c-814c-996e-f753232746ad", "362c3907-070c-8196-8de9-cf697750ccc9", "362c3907-070c-81d2-b39c-f9a85982b3a0", "362c3907-070c-81c0-a677-c6177fd62116"]}, {"id": "362c3907-070c-81e6-8cf9-ef4a591d251b", "Name": "3. AI-Driven Preparation Material for Negotiations", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "LLM-orchestrated negotiation brief generator combining SAP purchase history, EXIM benchmarks, commodity indices, and seasonal patterns; cuts prep time from 2–3 days to <30 minutes and standardizes negotiation quality across buyers", "Primary Users": ["Buyers", "Category Managers", "Sourcing Managers"], "Secondary Users": ["Procurement Analysts", "Supply Chain Head"], "Internal Systems Touched": ["Material Master", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "External Sourcing", "New Data Capture (Net-new)", "Process / Governance"], "External Data Sources Needed": ["Commodity Price Indices", "EXIM / Customs Data", "Macro Indicators (FX / Fuel / CPI)"], "Data Fields": ["362c3907-070c-814b-8094-e7a20dee36bc", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8122-8c76-c7f4bcca5cd5", "362c3907-070c-81b8-bba6-df32203a4595", "362c3907-070c-8189-942e-f66346533984", "362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-812e-ad86-e9553adfafb0", "362c3907-070c-81a1-8ee9-cff5b4559b10", "362c3907-070c-8152-a780-e7d08d74cbb1", "362c3907-070c-817d-ac3b-eb3e13419153", "362c3907-070c-81c7-a957-e313c4b5dc3e", "362c3907-070c-81f4-97b8-cda8e0af802f", "362c3907-070c-819e-a13e-c3da28597217", "362c3907-070c-8138-a48f-dc329183d415", "362c3907-070c-8162-8d23-ed6030d6f539", "362c3907-070c-8160-a7a6-c56a59c64e84", "362c3907-070c-8133-ab67-d7aaccecdd73", "362c3907-070c-813a-bf87-f909f498c45b", "362c3907-070c-8136-adad-e17f91efcfae", "362c3907-070c-8161-9ba5-ea01bc5b1e85", "362c3907-070c-81f2-905a-ee126b55237e"]}, {"id": "362c3907-070c-81be-b890-d6d7cf544674", "Name": "4. Vendor Creditworthiness & Fraud Check", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Automated vendor risk scoring at onboarding and ongoing monitoring via GST portal, MCA21, credit bureau, and court records; composite tier (green/amber/red) gates Ariba onboarding and triggers pre-PO alerts; protects the 300+ vendor long tail from default, fraud, and GST input-tax-credit risk", "Primary Users": ["Procurement Analysts", "Sourcing Managers", "Supply Chain Head"], "Secondary Users": ["Buyers", "CFO", "Finance / Compliance", "Risk Team"], "Internal Systems Touched": ["Ariba", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "External Sourcing", "Process / Governance", "System Integration"], "External Data Sources Needed": ["Court / Litigation Records", "Credit Bureau", "GST Portal API", "MCA21"], "Data Fields": ["362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-814c-9e8d-d7d0d3e54781", "362c3907-070c-810f-b29d-fd0d6905e566", "362c3907-070c-816f-a9c5-eea437938c02", "362c3907-070c-81e5-9e0d-f32c1c4ebfe2", "362c3907-070c-8134-b7d3-dde63d551638", "362c3907-070c-8168-a8db-ff1fdaf56481", "362c3907-070c-8120-87b8-e8921f5af144", "362c3907-070c-81dd-adf0-d467e120de3f", "362c3907-070c-81e8-86eb-c6f83dbeda02", "362c3907-070c-817e-bde3-c991796aaea6", "362c3907-070c-818f-9fa2-f331ebd6e952", "362c3907-070c-810f-8631-c2e0a2f12917", "362c3907-070c-818d-bc8e-c3eb44745aa8", "362c3907-070c-81ec-bb18-d30fd65f05e6", "362c3907-070c-8178-8968-cfeef1d3c676", "362c3907-070c-81df-bf42-ced939198c43", "362c3907-070c-815b-bc96-e178cd43105c"]}, {"id": "362c3907-070c-8171-ab83-d35e6c33ce39", "Name": "5. AI-Led Vendor Identification & Recommendation", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "AI-ranked vendor recommendations per commodity combining SAP performance history (GRN + price), EXIM-sourced new vendor signals, and UC #5 risk filters; one-click Ariba RFQ trigger; reduces vendor discovery time >90% and surfaces direct-manufacturer alternatives to traders", "Primary Users": ["Buyers", "Category Managers", "Sourcing Managers"], "Secondary Users": ["Procurement Analysts", "Supply Chain Head"], "Internal Systems Touched": ["Ariba", "Material Master", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "External Sourcing", "Master Data Quality", "System Integration"], "External Data Sources Needed": ["EXIM / Customs Data", "External Vendor Databases"], "Data Fields": ["362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-810f-b29d-fd0d6905e566", "362c3907-070c-814c-9e8d-d7d0d3e54781", "362c3907-070c-812e-ad86-e9553adfafb0", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-81a1-8ee9-cff5b4559b10", "362c3907-070c-8122-8c76-c7f4bcca5cd5", "362c3907-070c-8152-a780-e7d08d74cbb1", "362c3907-070c-817d-ac3b-eb3e13419153", "362c3907-070c-81c7-a957-e313c4b5dc3e", "362c3907-070c-8133-ab67-d7aaccecdd73", "362c3907-070c-816f-a9c5-eea437938c02", "362c3907-070c-81e5-9e0d-f32c1c4ebfe2", "362c3907-070c-8120-87b8-e8921f5af144", "362c3907-070c-818f-9fa2-f331ebd6e952", "362c3907-070c-81df-bf42-ced939198c43", "362c3907-070c-815b-bc96-e178cd43105c", "362c3907-070c-814a-880f-f93a105b3709", "362c3907-070c-81d9-8c92-fec22a583a0a", "362c3907-070c-817f-a70f-da028aa459aa", "362c3907-070c-812f-bdf2-c7a476e46c18", "362c3907-070c-8127-bec4-de6d98f1bb2e", "362c3907-070c-81ea-a745-e02474bd890e"]}, {"id": "362c3907-070c-813a-9eae-fa94a2826ff1", "Name": "6. Should-Cost Modelling & Analysis", "Theme": "Procurement", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Automated cost build-up calculator per SKU combining raw material indices, labor rates, energy/utility costs, freight, and overhead benchmarks; outputs target cost band that auto-updates as inputs change; arms sourcing managers with an independent reference to challenge vendor quotes systematically", "Primary Users": ["Category Managers", "Sourcing Managers"], "Secondary Users": ["CFO", "Procurement Analysts", "Supply Chain Head"], "Internal Systems Touched": ["Material Master", "SAP", "Vendor Master"], "Data Gap Types": ["Analytics / Dashboard Layer", "External Sourcing", "Net-new Definition Required", "Taxonomy Build"], "External Data Sources Needed": ["Commodity Price Indices", "EXIM / Customs Data", "Energy / Utility Rate Sources", "Industry / Labor Benchmarks", "Macro Indicators (FX / Fuel / CPI)"], "Data Fields": ["362c3907-070c-8122-8c76-c7f4bcca5cd5", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8124-800c-c177c61c6846", "362c3907-070c-81a1-8ee9-cff5b4559b10", "362c3907-070c-81f4-97b8-cda8e0af802f", "362c3907-070c-8152-a780-e7d08d74cbb1", "362c3907-070c-8138-a48f-dc329183d415", "362c3907-070c-8162-8d23-ed6030d6f539", "362c3907-070c-8160-a7a6-c56a59c64e84", "362c3907-070c-8189-942e-f66346533984", "362c3907-070c-8102-b831-dc036073c2f4", "362c3907-070c-812e-8fd2-c4d872900d8b", "362c3907-070c-81e1-98a1-da150c725467", "362c3907-070c-81e9-96c7-dca3455f4838", "362c3907-070c-8199-a393-c645682afe1b", "362c3907-070c-8143-876d-ca2bd8d5987b", "362c3907-070c-8129-a2e2-f47866274c2c"]}, {"id": "362c3907-070c-814f-abfc-f89d753f80e0", "Name": "7. Field Performance Dashboard", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Unified real-time sales performance dashboard across SAP, Growthbook, and Saathi with drill-down from Sales Head → RBM → TBM → dealer → SKU; mid-month early-warning alerts on target attainment; replaces 4–6 hours/week of manual report consolidation per field manager", "Primary Users": ["HO Leadership", "RBMs", "Sales Head", "TBMs"], "Secondary Users": ["Business Head (BH)", "Commercial Team", "MGOs", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "Excel — Targets / Schemes", "Growthbook", "Material Master", "SAP", "SAP BW", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "System Integration", "Tagging / Classification"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8124-800c-c177c61c6846", "362c3907-070c-810b-a763-dc99623eddc2", "362c3907-070c-81aa-8fd5-f60c7a3a46c0", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-8121-99b0-d54099a48f80", "362c3907-070c-81f3-9d13-cedfce719725", "362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8120-be4d-f6fc130829ad", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-816f-94af-da87815eb94b", "362c3907-070c-816d-a168-c929b61e2ba3", "362c3907-070c-8124-bbdc-f7b87ea33eed", "362c3907-070c-81ba-a26e-f4d4d89959d4", "362c3907-070c-8173-a6cd-dfb6f29ffbb6", "362c3907-070c-81a5-8228-c42f98e819d1", "362c3907-070c-815e-91f5-dd3e45c2ecf2", "362c3907-070c-81cb-87eb-d6079b8c8747", "362c3907-070c-8123-8de2-ffc4d48acb52"]}, {"id": "362c3907-070c-813d-b5a0-c1f1e488f558", "Name": "8. Dealer Profiles (Saathi)", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Consolidated dealer 360° profile inside Saathi App combining SAP transactions, Saathi engagement, scheme participation, and AI-captured TBM voice notes; auto-tiered Platinum/Gold/Silver/Bronze; eliminates 2–4 weeks of context-rebuild when TBMs change territories and gives HO leadership systematic dealer mix analytics", "Primary Users": ["MGOs", "RBMs", "Sales Head", "TBMs"], "Secondary Users": ["Commercial Team", "HO Leadership", "Product Marketing", "Saathi App Owner", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "Growthbook", "SAP", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "New Data Capture (Net-new)", "System Integration", "Unstructured → Structured"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8120-be4d-f6fc130829ad", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-816f-94af-da87815eb94b", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-816d-a168-c929b61e2ba3", "362c3907-070c-8124-bbdc-f7b87ea33eed", "362c3907-070c-81a5-8228-c42f98e819d1", "362c3907-070c-8121-99b0-d54099a48f80", "362c3907-070c-816c-88de-dd62a2689691", "362c3907-070c-81e0-be78-cb83498bad54", "362c3907-070c-810d-b7a4-d25de446afbc", "362c3907-070c-81dd-b810-de1c23ed8aef", "362c3907-070c-8141-b2a1-d572fb4edbcd", "362c3907-070c-8190-ba50-f03de70264a4", "362c3907-070c-8135-8a3c-f4bf46777961", "362c3907-070c-8113-ba3e-eeb95656b3ba", "362c3907-070c-81ad-b22d-e8663c9b9fea", "362c3907-070c-8160-a886-dbfa809de5c7"]}, {"id": "362c3907-070c-8196-b21c-cfa8eaed134e", "Name": "9. Activity Analytics", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Automated field force activity capture via Saathi App (in-app voice + check-in) combined with sales data; surfaces visit cadence, dealer coverage %, time allocation, and call types; correlates activity intensity with sales outcomes; coverage-gap alerts and data-grounded RBM coaching inputs replace anecdotal management", "Primary Users": ["MGOs", "RBMs", "Sales Head", "TBMs"], "Secondary Users": ["HO Leadership", "L&D / Training", "Saathi App Owner", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "SAP", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "New Data Capture (Net-new)", "Unstructured → Structured"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-816f-94af-da87815eb94b", "362c3907-070c-8121-99b0-d54099a48f80", "362c3907-070c-81f3-9d13-cedfce719725", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-81a5-8228-c42f98e819d1", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-8113-ba3e-eeb95656b3ba", "362c3907-070c-8190-ba50-f03de70264a4", "362c3907-070c-81ca-bf07-e445098c8a6b", "362c3907-070c-81b9-aa17-f6b0f68d8bc0", "362c3907-070c-8115-8ce8-dc4fb2cbc043", "362c3907-070c-816a-982c-e88a9cd9b81b", "362c3907-070c-815a-bacc-db48372d4dea", "362c3907-070c-81a5-9aec-c750d8ccf44c"]}, {"id": "362c3907-070c-812a-9299-f0801068b046", "Name": "10. Scheme Chatbot", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Multi-lingual conversational chatbot inside Saathi App answering scheme queries (eligibility, discount slabs, claim process) grounded in actual circulars via RAG; eliminates TBM scheme-rule errors that today cause claim rejections and dealer trust damage; reduces ~30% of TBM time spent on scheme Q&A", "Primary Users": ["Dealers", "MGOs", "RBMs", "TBMs"], "Secondary Users": ["Commercial Team", "Product Marketing", "Sales Head", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "Excel — Targets / Schemes", "Growthbook", "Internal Docs (PDF / Circulars)", "SAP", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Process / Governance", "System Integration", "Unstructured → Structured"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8124-bbdc-f7b87ea33eed", "362c3907-070c-8173-a6cd-dfb6f29ffbb6", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-810d-b7a4-d25de446afbc", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-815d-86c5-c9487eed92af", "362c3907-070c-8123-8811-e1367f363d0a", "362c3907-070c-81ea-9a4a-d04cf05dc3ae", "362c3907-070c-8110-8d31-d234632b0813", "362c3907-070c-814b-a5eb-c5f65745369f", "362c3907-070c-81de-87e6-da83c810e9db", "362c3907-070c-8196-b240-cce2d655ac63"]}, {"id": "362c3907-070c-8131-8246-d0b70feba635", "Name": "11. AI Sales Coaching", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Personalized RBM coaching surface combining activity patterns, sales outcomes, and conversation analysis from actual dealer voice captures; specific behavior-grounded coaching recommendations replace generic anecdotal advice; feeds L&D personalized training paths based on cohort skill-gap patterns", "Primary Users": ["MGOs", "RBMs", "Sales Head"], "Secondary Users": ["HO Leadership", "L&D / Training", "Saathi App Owner", "Sales Ops", "TBMs"], "Internal Systems Touched": ["Customer / Dealer Master", "Growthbook", "SAP", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Net-new Definition Required", "Process / Governance", "Unstructured → Structured"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-81f3-9d13-cedfce719725", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-815e-91f5-dd3e45c2ecf2", "362c3907-070c-8124-bbdc-f7b87ea33eed", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-8190-ba50-f03de70264a4", "362c3907-070c-8135-8a3c-f4bf46777961", "362c3907-070c-81ca-bf07-e445098c8a6b", "362c3907-070c-81b9-aa17-f6b0f68d8bc0", "362c3907-070c-815a-bacc-db48372d4dea", "362c3907-070c-81a5-9aec-c750d8ccf44c", "362c3907-070c-818d-8962-e904dc836b63", "362c3907-070c-810e-86a3-fb612b7a13be", "362c3907-070c-8177-b177-c41070112525", "362c3907-070c-8149-9651-e6825e088297", "362c3907-070c-8162-bb60-fc0c5a0b6586"]}, {"id": "362c3907-070c-8184-84b8-c8eba006a29a", "Name": "12. Unified Product & Partner-Level Visibility", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Consolidated cross-BU dealer × product dashboard surfacing product-mix breakdown, cross-sell opportunity scoring, and cannibalization signals across Seeds / CP / SPN; replaces per-BU siloed views with portfolio-level dealer concentration and launch impact analytics", "Primary Users": ["Business Head (BH)", "Commercial Team", "HO Leadership", "Sales Head"], "Secondary Users": ["CFO", "MGOs", "Product Marketing", "RBMs", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "Growthbook", "Material Master", "SAP"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "Tagging / Classification", "Taxonomy Build"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8120-be4d-f6fc130829ad", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8124-800c-c177c61c6846", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-816d-a168-c929b61e2ba3", "362c3907-070c-810d-b7a4-d25de446afbc", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-81e0-be78-cb83498bad54", "362c3907-070c-81b5-9946-d963580d815a", "362c3907-070c-8148-a6f6-fc4725085859", "362c3907-070c-81dd-b856-c6314d7f1c31", "362c3907-070c-819f-8d4b-c43f46f49830"]}, {"id": "362c3907-070c-8135-aed0-fadc66a03638", "Name": "14. Warehouse Stock Visibility", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Real-time consolidated stock view across SFS-owned warehouses + vendor / external warehouses + in-transit stock inside Saathi App at order entry; surfaces multi-source availability with staleness indicators, expiry status, recommended source warehouse, and substitution suggestions; eliminates TBM credibility loss from over-committed delivery dates and gives Dispatch + Commercial early warning on low-stock and expiry risks", "Primary Users": ["Dispatch Planner", "Logistics Lead", "RBMs", "Sales Head", "TBMs"], "Secondary Users": ["Commercial Team", "Dealers", "Sales Ops", "Supply Chain Head"], "Internal Systems Touched": ["Customer / Dealer Master", "Logistics System", "Material Master", "SAP", "SAP BW", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "System Integration"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-8129-b8be-ce2e3f80664b", "362c3907-070c-8124-800c-c177c61c6846", "362c3907-070c-8122-8c76-c7f4bcca5cd5", "362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-8115-aa0c-c7d3c16b5453", "362c3907-070c-81aa-8fd5-f60c7a3a46c0", "362c3907-070c-81dd-b810-de1c23ed8aef", "362c3907-070c-8118-8e38-f17dccf58f1d", "362c3907-070c-81fa-ae66-df672419f04b", "362c3907-070c-816e-94c9-fc3fbe5cee90", "362c3907-070c-81c8-94b9-d6eb95092883", "362c3907-070c-81e0-a8cf-c235c1c1383d", "362c3907-070c-812b-9de5-edbbcb02f7e2", "362c3907-070c-8146-bace-f12296e06dd6", "362c3907-070c-81e6-afa1-c77df103f2b1", "362c3907-070c-811e-aa71-c278af956e18", "362c3907-070c-8151-ade0-d3bda6fe23cd", "362c3907-070c-8165-92bd-d44e8d14bc06"]}, {"id": "362c3907-070c-8148-a71b-dbe81c3b2732", "Name": "13. Early Warning for Sales Performance & Dealer Churn Risk", "Theme": "Field Force + Salesforce", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Monthly churn risk score per dealer combining sales decline, scheme participation drop, complaint signals from voice captures, payment behavior, and GST default flags; contributing-factor breakdown routes to TBM (action) + Central Finance (credit risk) + RBM (coaching context); enables targeted intervention before churn becomes irreversible", "Primary Users": ["Central Finance", "RBMs", "Sales Head", "TBMs"], "Secondary Users": ["Business Head (BH)", "Commercial Team", "HO Leadership", "MGOs"], "Internal Systems Touched": ["Customer / Dealer Master", "Growthbook", "SAP", "Saathi App"], "Data Gap Types": ["Analytics / Dashboard Layer", "Process / Governance"], "External Data Sources Needed": ["GST Portal API"], "Data Fields": ["362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-816f-94af-da87815eb94b", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-8124-bbdc-f7b87ea33eed", "362c3907-070c-81a5-8228-c42f98e819d1", "362c3907-070c-815e-91f5-dd3e45c2ecf2", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-81e0-be78-cb83498bad54", "362c3907-070c-8113-ba3e-eeb95656b3ba", "362c3907-070c-8135-8a3c-f4bf46777961", "362c3907-070c-816c-88de-dd62a2689691", "362c3907-070c-81b9-aa17-f6b0f68d8bc0", "362c3907-070c-8174-99b6-c10cadb4f2f5", "362c3907-070c-81d3-95ec-d3b7bc982fb5", "362c3907-070c-81e2-8236-fdd7972fd354", "362c3907-070c-81b2-a503-e43a59b99d62", "362c3907-070c-8104-a06b-d3e69daedcec", "362c3907-070c-811f-a201-f320cfac2095"]}, {"id": "362c3907-070c-819a-a256-c13f2ca414e2", "Name": "Enterprise Chat Assistant (Supply & Sales)", "Theme": "Enterprise Assistant", "Build Mode": "Build", "Discovery Status": "Drafted in Chat", "Headline": "Natural-language chat surface for leadership over a curated enterprise metrics layer covering Supply + Sales; collapses monthly review prep from 3–5 days to half a day, time-to-answer on ad-hoc queries from days to minutes; eliminates KPI definition drift via single shared metrics dictionary; weekly 'what changed' digest pushes outliers proactively", "Primary Users": ["Business Head (BH)", "CFO", "HO Leadership", "Sales Head", "Supply Chain Head"], "Secondary Users": ["Central Finance", "Commercial Team", "Procurement Analysts", "Sales Ops"], "Internal Systems Touched": ["Customer / Dealer Master", "Excel — Targets / Schemes", "Growthbook", "Material Master", "SAP", "SAP BW"], "Data Gap Types": ["Analytics / Dashboard Layer", "Master Data Quality", "Net-new Definition Required", "Tagging / Classification", "Taxonomy Build"], "External Data Sources Needed": ["None"], "Data Fields": ["362c3907-070c-810f-b29d-fd0d6905e566", "362c3907-070c-81aa-baad-d05951f68344", "362c3907-070c-8126-9be2-d23be6262977", "362c3907-070c-812a-9e2a-c6688e4dd041", "362c3907-070c-8121-99b0-d54099a48f80", "362c3907-070c-8186-bb93-c551826d0cac", "362c3907-070c-81ba-a26e-f4d4d89959d4", "362c3907-070c-8173-a6cd-dfb6f29ffbb6", "362c3907-070c-816d-a168-c929b61e2ba3", "362c3907-070c-8160-a886-dbfa809de5c7", "362c3907-070c-810d-b7a4-d25de446afbc", "362c3907-070c-81b5-9946-d963580d815a", "362c3907-070c-81e0-be78-cb83498bad54", "362c3907-070c-81bc-8da0-fb6bad1b97d6", "362c3907-070c-8117-bee9-d657ffc532a4", "362c3907-070c-81bb-9e5d-e46b9b6b26f0", "362c3907-070c-81a0-b7c0-f45f21ecad25", "362c3907-070c-8123-9d9d-cc8488daabf1"]}], "dataFields": [{"id": "362c3907-070c-810f-b29d-fd0d6905e566", "Field Name": "Vendor Region", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Vendor Master", "Gap Type": [], "Description": "Geographic region associated with the vendor", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8122-8c76-c7f4bcca5cd5", "Field Name": "Quantity Ordered (PO line)", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Quantity ordered per PO line item", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-813a-9eae-fa94a2826ff1", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8124-800c-c177c61c6846", "Field Name": "Unit of Measure (UoM)", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Material Master", "Gap Type": [], "Description": "Unit of measure associated with each material in material master", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-813a-9eae-fa94a2826ff1", "362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8129-b8be-ce2e3f80664b", "Field Name": "Material Description", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Material Master", "Gap Type": ["Master Data Quality", "Taxonomy Build"], "Description": "Free-text description of each material/SKU in the SAP material master", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-813a-9eae-fa94a2826ff1", "362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-812e-ad86-e9553adfafb0", "Field Name": "Material Code (PO line)", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Material/SKU code referenced on each PO line item", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8141-bd18-f78cb53bbd6d", "Field Name": "Plant / Region (on PO)", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Plant or regional location associated with the PO", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814b-8094-e7a20dee36bc", "Field Name": "PO Number", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Unique identifier for each purchase order in SAP", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814c-9e8d-d7d0d3e54781", "Field Name": "Vendor GSTIN", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Vendor Master", "Gap Type": [], "Description": "GST identification number for the vendor", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8189-942e-f66346533984", "Field Name": "PO Date", "Availability": "Available", "Format": "Date / Datetime", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Date of purchase order creation", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a1-8ee9-cff5b4559b10", "Field Name": "Unit Price (PO line)", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Per-unit purchase price on each PO line item", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a9-ae5b-cc2b5637b8df", "Field Name": "Line Item Value (PO line)", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Total value per PO line (quantity × unit price)", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81aa-baad-d05951f68344", "Field Name": "Vendor Name", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Vendor Master", "Gap Type": ["Master Data Quality"], "Description": "Vendor name as stored in SAP vendor master", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81bc-b484-c1d7771d18f0", "Field Name": "Vendor ID (on PO)", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Vendor identifier referenced on each PO line; foreign key to vendor master", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-810d-bb36-c31af3c038c9", "Field Name": "Product Category Hierarchy", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Taxonomy Build"], "Description": "Master hierarchical structure mapping category → sub-category → SKU; applied to material master", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8126-b0c0-e407a5a01b5c", "Field Name": "Strategic Spend Classification", "Availability": "Unavailable", "Format": "String", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Tagging / Classification"], "Description": "Strategic classification flag for each PO line (e.g., freight, packaging, services, raw material) per business-defined rules", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-813b-8fb3-dc301d2691e0", "Field Name": "SG&A Expense Amount", "Availability": "Partial", "Format": "Numeric", "Ownership": "Owned", "Source System": "Concur", "Gap Type": ["System Integration"], "Description": "SG&A expense line amounts tracked in Concur (currently siloed from SAP)", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8163-b68a-d9ae22dca7e6", "Field Name": "BPV Gap", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed gap between price paid and Best Price Vendor benchmark, expressed in % and absolute INR per SKU per transaction", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8176-a713-fc7b39696669", "Field Name": "Best Price Vendor (BPV) per SKU", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed identifier of the lowest-price vendor per SKU over a defined period, used as the benchmark for BPV leakage analysis", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a2-8f56-cc5ff9d4909a", "Field Name": "Spend Sub-Category Tag", "Availability": "Unavailable", "Format": "String", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Tagging / Classification", "Taxonomy Build"], "Description": "Second-level spend classification under each top-level category (e.g., Active Ingredient under Raw Materials)", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a4-bd3f-dcbc5e6d012c", "Field Name": "SG&A Expense Category", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "Concur", "Gap Type": ["System Integration"], "Description": "Category/classification of each SG&A expense in Concur", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81aa-b571-ffbb657de8b0", "Field Name": "Spend Anomaly Flag", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Boolean/severity flag triggered when a PO line price exceeds variance threshold or BPV gap exceeds tolerance — feeds the anomaly alert system", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ae-b8e2-cdc4eab3800b", "Field Name": "Vendor License Validity Date", "Availability": "Partial", "Format": "Date / Datetime", "Ownership": "Owned", "Source System": "Complinity", "Gap Type": ["System Integration"], "Description": "Expiry/validity dates for vendor licenses tracked in Complinity", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81b8-bba6-df32203a4595", "Field Name": "Commodity Price Index", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Commodity Price Provider", "Gap Type": ["External Sourcing"], "Description": "External monthly commodity price indices relevant to SFS raw material categories (e.g., crude oil, key agrochemical intermediates)", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81bc-8da0-fb6bad1b97d6", "Field Name": "Spend Category Tag", "Availability": "Unavailable", "Format": "String", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Tagging / Classification", "Taxonomy Build"], "Description": "Top-level spend category classification for each PO line (e.g., Raw Materials, Packaging, Services, Freight)", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81c2-ae2c-dce226ddd790", "Field Name": "Vendor License Status", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "Complinity", "Gap Type": ["System Integration"], "Description": "Current license/compliance status of vendor as tracked in Complinity", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e5-ace9-d0e127e98dcc", "Field Name": "Price Variance (SKU × Vendor × Time)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed price variability metric across vendors and time periods for each SKU; used to detect inconsistent buying patterns", "Related Use Cases": ["362c3907-070c-81c5-82fb-e6286a2f112a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8137-821e-d8e28bd0d18b", "Field Name": "EXIM Transaction Date", "Availability": "Unavailable", "Format": "Date / Datetime", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Transaction date for each EXIM record (typically date of customs clearance)", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-813e-94d3-d68d3b1dac35", "Field Name": "EXIM HSN Code", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing", "System Integration"], "Description": "HSN code on each EXIM transaction; the foreign key that maps EXIM transactions to SFS material master for benchmark comparisons", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814b-91fc-defc42c4143b", "Field Name": "EXIM Importer Name", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Name of the importing entity per EXIM transaction (i.e., who is buying); enables tracking of competitor activity and detection of large/unusual purchases", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814c-996e-f753232746ad", "Field Name": "Trader Premium per SKU", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed premium per SKU: SFS purchase price − EXIM landed cost benchmark; quantifies the trader markup paid on each transaction", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8152-a780-e7d08d74cbb1", "Field Name": "HSN Code (per SKU)", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Material Master", "Gap Type": ["Master Data Quality", "Tagging / Classification"], "Description": "Harmonized System of Nomenclature code per material/SKU; the critical join key between SAP material master and external EXIM data", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8174-bac4-e248eabe6841", "Field Name": "EXIM Import Quantity", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Per-transaction import quantity by HSN code; used to size benchmarks and detect anomalous trade volumes (large competitor purchases)", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-817d-ac3b-eb3e13419153", "Field Name": "EXIM Import Price (CIF / Landed Cost)", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Per-transaction import price in CIF (cost, insurance, freight) or landed cost terms from Indian customs data; the benchmark against which SFS purchase prices are compared", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8196-8de9-cf697750ccc9", "Field Name": "EXIM Benchmark Deviation Alert", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Boolean/severity flag triggered when SFS purchase price deviates from rolling EXIM benchmark beyond threshold — feeds weekly buyer alerts", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81c0-a677-c6177fd62116", "Field Name": "Largest Importers per HSN", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Aggregated view ranking largest importers per HSN code; tracks competitor purchasing activity and surfaces anomalies (e.g., 3x average purchase by single importer)", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81c7-a957-e313c4b5dc3e", "Field Name": "EXIM Country of Origin", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Country of origin for each import transaction; used to identify lowest-cost source countries and supplier-share-by-country trends", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81d2-b39c-f9a85982b3a0", "Field Name": "Top Source Countries per HSN", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Aggregated view ranking top source countries per HSN code by import volume and value over rolling periods; identifies lowest-cost sourcing geographies", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81f4-97b8-cda8e0af802f", "Field Name": "EXIM Exporter / Global Supplier", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "EXIM Data Provider", "Gap Type": ["External Sourcing"], "Description": "Name of the exporting entity per EXIM transaction (i.e., the global supplier); enables identification of direct-manufacturer sourcing opportunities and bypassing of trader markups", "Related Use Cases": ["362c3907-070c-817e-9c08-d74f3d4a2ce2", "362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8133-ab67-d7aaccecdd73", "Field Name": "Per-Vendor Pricing Pattern", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed vendor-level behavioral profile: historical pricing patterns by SKU × quarter × buyer; surfaces insights like 'Vendor X typically quotes 8–12% above market in Q2' to inform negotiation timing and vendor selection", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8136-adad-e17f91efcfae", "Field Name": "Recommended Target Price", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Synthesized target price range per SKU × vendor; combines EXIM benchmark, commodity index, vendor pricing history, seasonal pattern, and macro context into a single anchor price for negotiation", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8138-a48f-dc329183d415", "Field Name": "USD/INR FX Rate", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Macro Indicators (Public)", "Gap Type": ["External Sourcing"], "Description": "USD to INR foreign exchange rate (spot and forward); critical for any import-priced commodity and for translating EXIM benchmarks to landed INR cost", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-813a-bf87-f909f498c45b", "Field Name": "Seasonal Buy Pattern per Commodity", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed identification of optimal buying windows per commodity, based on 3-yr SAP purchase history + commodity index seasonality; e.g., 'lock prices in Oct-Nov before seasonal Q2 spike'", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8160-a7a6-c56a59c64e84", "Field Name": "Agri Commodity / MSP Index", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Macro Indicators (Public)", "Gap Type": ["External Sourcing"], "Description": "Government-declared Minimum Support Prices (MSP) for major agri commodities + agri CPI; informs seed sourcing economics, dealer scheme design, and farmer-facing pricing context", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8161-9ba5-ea01bc5b1e85", "Field Name": "AI-Generated Negotiation Brief", "Availability": "Unavailable", "Format": "Text (Long)", "Ownership": "Uncaptured", "Source System": "Conversational AI Surface", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "LLM-generated negotiation brief document containing opening position, talking points, counter-offer scripts, reference price ranges, and timing recommendations — generated on-demand per commodity × vendor", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8162-8d23-ed6030d6f539", "Field Name": "Crude Oil / Diesel Price Index", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Macro Indicators (Public)", "Gap Type": ["External Sourcing"], "Description": "Crude oil price index (Brent / WTI) and Indian diesel retail prices; drives transportation cost and feeds into raw-material cost models for crude-derivative-based CP/SPN actives", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b", "362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-819e-a13e-c3da28597217", "Field Name": "Negotiation Outcome Log", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Conversational AI Surface", "Gap Type": ["New Data Capture (Net-new)", "Process / Governance"], "Description": "Structured + qualitative log of negotiation outcomes captured post-negotiation: commodity, vendor, opening position, target price (from brief), agreed price, deviation from brief, qualitative notes on vendor reactions and surprises; linked to the originating brief ID for the learning loop", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81f2-905a-ee126b55237e", "Field Name": "Buyer Price Variance (Same SKU × Period)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed price variance across different buyers purchasing the same SKU within the same time window; quantifies the 'hero buyer' inconsistency where one buyer pays materially different prices than another for identical goods", "Related Use Cases": ["362c3907-070c-81e6-8cf9-ef4a591d251b"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-810f-8631-c2e0a2f12917", "Field Name": "Credit Default History", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "Credit Bureau", "Gap Type": ["External Sourcing"], "Description": "History of payment defaults, delays, and NPA classifications for vendor entity; complements the credit score with detail on default events", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8120-87b8-e8921f5af144", "Field Name": "MCA Company Status", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "MCA21", "Gap Type": ["External Sourcing"], "Description": "Operating status of vendor's legal entity per MCA records: Active / Strike Off / Dormant / Under Liquidation / Amalgamated", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8134-b7d3-dde63d551638", "Field Name": "GST Return Filing History", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "GST Portal (via GSP)", "Gap Type": ["External Sourcing", "System Integration"], "Description": "Monthly GSTR-1 (outward supplies) and GSTR-3B (summary returns) filing history per GSTIN; basis for detecting filing defaults and input-tax-credit risk", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-815b-bc96-e178cd43105c", "Field Name": "Vendor Risk Tier", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Process / Governance"], "Description": "Tier classification (Green / Amber / Red) derived from Composite Risk Score; drives Ariba onboarding gate, pre-PO buyer prompts, and monitoring frequency", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8168-a8db-ff1fdaf56481", "Field Name": "GST Default Flag", "Availability": "Unavailable", "Format": "Boolean", "Ownership": "Sourced", "Source System": "GST Portal (via GSP)", "Gap Type": ["Analytics / Dashboard Layer", "External Sourcing"], "Description": "Derived boolean flag triggered when vendor misses GST filings for consecutive periods (e.g., 2+ months); drives 'hold new POs pending clarification' alerts to buyers and Supply Chain Head", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816f-a9c5-eea437938c02", "Field Name": "Vendor PAN", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Vendor Master", "Gap Type": [], "Description": "Permanent Account Number for the vendor entity; entity-level tax ID used for MCA21 lookups and cross-source identity resolution", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8178-8968-cfeef1d3c676", "Field Name": "Vendor Onboarding Workflow Status", "Availability": "Unavailable", "Format": "String", "Ownership": "Owned", "Source System": "Ariba", "Gap Type": ["Process / Governance", "System Integration"], "Description": "Vendor's current state in the Ariba onboarding pipeline (Submitted / Under Review / Risk Check Triggered / Approved / Rejected); the trigger surface for firing the risk check at the right workflow step", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-817e-bde3-c991796aaea6", "Field Name": "MCA Charges / Encumbrances", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "MCA21", "Gap Type": ["External Sourcing"], "Description": "Outstanding charges and encumbrances against vendor company assets per MCA records (e.g., loans secured against plant, working capital limits); signal of financial leverage and distress", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-818d-bc8e-c3eb44745aa8", "Field Name": "Insolvency / NCLT Filings", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "Court / Litigation Records", "Gap Type": ["External Sourcing"], "Description": "Insolvency proceedings against vendor entity (CIRP / liquidation filings) sourced from IBBI / NCLT records; highest-signal litigation subset — drives immediate vendor block", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-818f-9fa2-f331ebd6e952", "Field Name": "Commercial Credit Score", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Credit Bureau", "Gap Type": ["External Sourcing"], "Description": "Commercial credit score for vendor entity (CIBIL Commercial / Experian Commercial / CRIF score); primary indicator of payment behavior and default probability", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81dd-adf0-d467e120de3f", "Field Name": "MCA Incorporation Date", "Availability": "Unavailable", "Format": "Date / Datetime", "Ownership": "Sourced", "Source System": "MCA21", "Gap Type": ["External Sourcing"], "Description": "Date of incorporation of vendor entity; used for vendor age scoring and shell-company detection (e.g., entity incorporated <12 months, no operating history)", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81df-bf42-ced939198c43", "Field Name": "Composite Vendor Risk Score", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Weighted composite score across GST + MCA + credit + litigation + tenure components; single numeric indicator driving risk tier classification", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e5-9e0d-f32c1c4ebfe2", "Field Name": "GSTIN Registration Status", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "GST Portal (via GSP)", "Gap Type": ["External Sourcing", "System Integration"], "Description": "Current registration status of vendor GSTIN: Active / Cancelled / Suspended / Provisional; pulled from GST portal via GSP", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674", "362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e8-86eb-c6f83dbeda02", "Field Name": "MCA Directors / Beneficial Owners", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "MCA21", "Gap Type": ["External Sourcing"], "Description": "Names, PANs, DINs, and other company affiliations of directors and beneficial owners per MCA records; surfaces cross-vendor concentration (same director across multiple SFS vendors = shell-company / collusion red flag)", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ec-bb18-d30fd65f05e6", "Field Name": "Litigation Records", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Sourced", "Source System": "Court / Litigation Records", "Gap Type": ["External Sourcing"], "Description": "Pending litigation and past judgements involving vendor entity, sourced from NJDG and supplementary legal databases; informs reputational and operational risk assessment", "Related Use Cases": ["362c3907-070c-81be-b890-d6d7cf544674"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8127-bec4-de6d98f1bb2e", "Field Name": "Vendor Composite Performance Score", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Multi-criteria weighted composite ranking vendors for recommendation fitness per category: price competitiveness + on-time delivery rate + quality rejection rate + risk-tier penalty; drives the AI-ranked vendor list surfaced to sourcing managers", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-812f-bdf2-c7a476e46c18", "Field Name": "Ariba RFQ Trigger Event", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Ariba", "Gap Type": ["New Data Capture (Net-new)", "System Integration"], "Description": "Audit-trail event record fired when a buyer clicks 'RFQ this vendor' from the recommendation interface; captures recommendation-vendor pair, buyer ID, commodity, timestamp, and downstream RFQ outcome — closing the loop between recommendation and actual sourcing event", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814a-880f-f93a105b3709", "Field Name": "GRN Quantity Received", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Quantity actually received against each PO line, captured at the Goods Receipt Note (GRN) step in SAP; basis for delivery completeness and on-time delivery measurement", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-817f-a70f-da028aa459aa", "Field Name": "GRN Receipt Date", "Availability": "Available", "Format": "Date / Datetime", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": [], "Description": "Date of goods receipt for each PO line; together with PO promised date, basis for computing on-time delivery rate per vendor", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81d9-8c92-fec22a583a0a", "Field Name": "GRN Quality Rejection Quantity", "Availability": "Partial", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Purchase Register", "Gap Type": ["Master Data Quality", "Tagging / Classification"], "Description": "Quantity rejected during quality inspection at GRN; basis for vendor quality rejection rate scoring (a target metric in the future-state vendor performance dashboard)", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ea-a745-e02474bd890e", "Field Name": "Vendor Capacity Signal", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Inferred indication of whether a vendor can supply at SFS-required volume; combines EXIM export volume (for new/global vendors) with SAP GRN volume history (for existing vendors); flags 'volume risk' when SFS demand exceeds historical supply patterns", "Related Use Cases": ["362c3907-070c-8171-ab83-d35e6c33ce39"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8102-b831-dc036073c2f4", "Field Name": "Cost Build-Up Template per Commodity", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Process / Governance", "Taxonomy Build"], "Description": "Methodology asset per commodity defining cost decomposition: raw material components → labor → energy/utility → manufacturing overhead → freight → vendor margin assumption. Foundational template that drives the should-cost calculator; component definitions and weights vary by commodity (seed treatment differs from agrochemical AI synthesis)", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8129-a2e2-f47866274c2c", "Field Name": "Input Cost Pass-Through Coefficient", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Sensitivity coefficient measuring how much SKU should-cost changes for a unit change in each input (e.g., '1% crude oil increase → 0.4% should-cost increase for SKU X'); used to detect when vendors over-pass-through input cost increases", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-812e-8fd2-c4d872900d8b", "Field Name": "Labor Rate Benchmark (Region × Skill Tier)", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Industry / Labor Benchmarks", "Gap Type": ["External Sourcing"], "Description": "Manufacturing labor rates segmented by Indian region (state / industrial cluster) and skill tier (skilled / semi-skilled / unskilled / supervisory); feeds the labor cost component of should-cost build-up", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8143-876d-ca2bd8d5987b", "Field Name": "Should-Cost Gap (Actual vs. Target)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed difference between actual vendor quote (or current purchase price) and Should-Cost Target Price for the same SKU; expressed in % and absolute INR; basis for systematic challenge of vendor quotes", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8199-a393-c645682afe1b", "Field Name": "Should-Cost Target Price (per SKU)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Synthesized target cost per SKU — raw material + labor + energy + overhead + freight + margin = should-cost band (low / median / high); central output of the model surfaced to sourcing managers for vendor quote evaluation", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e1-98a1-da150c725467", "Field Name": "Manufacturing Overhead Benchmark", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Industry / Labor Benchmarks", "Gap Type": ["External Sourcing"], "Description": "Industry-standard manufacturing overhead rates expressed as % of direct cost, segmented by process type (e.g., batch chemical synthesis, formulation, packaging); feeds the overhead component of should-cost build-up", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e9-96c7-dca3455f4838", "Field Name": "Industrial Electricity Tariff (Region)", "Availability": "Unavailable", "Format": "Numeric", "Ownership": "Sourced", "Source System": "Energy / Utility Rate Source", "Gap Type": ["External Sourcing", "Unstructured → Structured"], "Description": "Industrial electricity tariff rates by state and tariff category (LT / HT industrial); sourced from State Electricity Regulatory Commission (SERC) tariff orders; feeds the energy cost component of should-cost build-up", "Related Use Cases": ["362c3907-070c-813a-9eae-fa94a2826ff1"], "Source Group": "External (Market Data)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-810b-a763-dc99623eddc2", "Field Name": "Primary Sales Order Number", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": [], "Description": "Unique identifier for each primary sales order (SFS → dealer) in SAP", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8115-aa0c-c7d3c16b5453", "Field Name": "Dealer Region", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": [], "Description": "Geographic region associated with the dealer; used for territory-level analytics and reconciling with TBM/RBM coverage", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8120-be4d-f6fc130829ad", "Field Name": "Dealer Name", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": ["Master Data Quality"], "Description": "Dealer's registered legal/trade name in SAP Customer Master", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8184-84b8-c8eba006a29a"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8121-99b0-d54099a48f80", "Field Name": "Sales Region / Territory Code", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": [], "Description": "Sales territory / region code on each primary sales transaction; the aggregation key for RBM/TBM-level rollups in the performance dashboard", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8123-8de2-ffc4d48acb52", "Field Name": "Channel Stock Estimate (Primary − Secondary)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed estimate of channel stock (inventory held at dealer level) = primary sales (SFS → dealer) − secondary sales (dealer → retailer/farmer), adjusted for timing and returns; surfaces channel overstocking / understocking risks", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8124-bbdc-f7b87ea33eed", "Field Name": "Scheme Participation Record", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Growthbook", "Gap Type": ["Master Data Quality", "System Integration"], "Description": "Per-dealer scheme participation records from Growthbook: which schemes joined, claim status, payout amount; bundled as multi-field pending data model discovery", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8126-9be2-d23be6262977", "Field Name": "Primary Sales Quantity", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": [], "Description": "Quantity sold per primary sales line item; the volume basis for target attainment computation", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8148-a71b-dbe81c3b2732", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-812a-9e2a-c6688e4dd041", "Field Name": "Primary Sales Value", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": [], "Description": "Value per primary sales line item (quantity × invoice price); value basis for revenue target attainment", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8148-a71b-dbe81c3b2732", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-815e-91f5-dd3e45c2ecf2", "Field Name": "Target Attainment % (Period-to-Date)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed % of target achieved period-to-date per TBM × SKU (or aggregated to RBM/region level); the primary KPI surfaced in the performance dashboard", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816d-a168-c929b61e2ba3", "Field Name": "Secondary Sales Transaction", "Availability": "Available", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Growthbook", "Gap Type": ["System Integration"], "Description": "Per-transaction secondary sales records from Growthbook (dealer → retailer/farmer); bundled as multi-field record pending data model discovery (date, dealer, SKU, quantity, value, downstream buyer if captured)", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816f-94af-da87815eb94b", "Field Name": "Dealer Assigned TBM", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": ["Master Data Quality"], "Description": "TBM currently assigned to manage this dealer; the dealer→TBM mapping that drives territory rollups", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8173-a6cd-dfb6f29ffbb6", "Field Name": "Scheme Definition", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Excel — Targets / Schemes", "Gap Type": ["Process / Governance", "System Integration", "Unstructured → Structured"], "Description": "Definitions and rules for each sales scheme: eligibility criteria, discount %, slab structure, validity period, claim mechanism, settlement terms; bundled as multi-field record", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8186-bb93-c551826d0cac", "Field Name": "Dealer Code", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": [], "Description": "Unique identifier for each dealer in SAP Customer Master; the join key linking primary sales, secondary sales (Growthbook), and dealer engagement (Saathi App)", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8135-aed0-fadc66a03638", "362c3907-070c-8148-a71b-dbe81c3b2732", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a5-8228-c42f98e819d1", "Field Name": "Saathi Dealer Engagement Event", "Availability": "Available", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Saathi App", "Gap Type": [], "Description": "Per-dealer engagement events captured in the Saathi App: login frequency, session duration, transactions initiated, features used; bundled as multi-field record", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81aa-8fd5-f60c7a3a46c0", "Field Name": "Primary Sales Order Date", "Availability": "Available", "Format": "Date / Datetime", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": [], "Description": "Date of primary sales order (SFS → dealer)", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ba-a26e-f4d4d89959d4", "Field Name": "Sales Target (TBM × SKU × Period)", "Availability": "Partial", "Format": "Numeric", "Ownership": "Owned", "Source System": "Excel — Targets / Schemes", "Gap Type": ["Master Data Quality", "Process / Governance", "System Integration"], "Description": "Sales targets per TBM × SKU × period (typically monthly); currently held in Excel files maintained by Sales Ops, with format inconsistency across BUs", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81cb-87eb-d6079b8c8747", "Field Name": "Early-Warning Alert Flag (Trending Below Target)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Boolean flag triggered when TBM (or aggregated unit) is trending below target mid-period; e.g., <40% attainment by day 15 of month, or seasonality-adjusted threshold", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81f3-9d13-cedfce719725", "Field Name": "TBM ID / Sales Rep Code", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Sales & Distribution", "Gap Type": ["Master Data Quality"], "Description": "Identifier for the TBM (Territory Business Manager) or sales rep associated with each primary sales transaction; basis for individual performance attribution", "Related Use Cases": ["362c3907-070c-814f-abfc-f89d753f80e0", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-810d-b7a4-d25de446afbc", "Field Name": "Dealer BU Presence", "Availability": "Partial", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": ["Master Data Quality", "Tagging / Classification"], "Description": "Which SFS Business Units (Seeds / CP / SPN) the dealer operates in; basis for multi-BU dealer mix analytics and cross-sell opportunity identification", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8113-ba3e-eeb95656b3ba", "Field Name": "Dealer Last Visit Timestamp", "Availability": "Partial", "Format": "Date / Datetime", "Ownership": "Captured", "Source System": "Saathi App", "Gap Type": ["Master Data Quality", "Process / Governance"], "Description": "Timestamp of most recent TBM visit to the dealer; captured via Saathi App check-in (or potentially Neosapien GPS); basis for visit cadence analytics", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8135-8a3c-f4bf46777961", "Field Name": "Dealer Relationship Profile (Structured)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Unstructured → Structured"], "Description": "LLM-extracted structured profile derived from Dealer Voice Capture: themes, sentiment, mentioned topics (price, schemes, products, family / succession, competitor mentions), key entities, decision-maker mentions, action items. Downstream UCs consume this rather than the raw audio.", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8141-b2a1-d572fb4edbcd", "Field Name": "Dealer Onboarding Date", "Availability": "Available", "Format": "Date / Datetime", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": [], "Description": "Date the dealer was onboarded to SFS; basis for dealer tenure within the tier algorithm and for cohort analytics", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8160-a886-dbfa809de5c7", "Field Name": "Dealer Tier (Platinum / Gold / Silver / Bronze)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Computed tier classification (Platinum / Gold / Silver / Bronze) per dealer based on multi-criteria score: sales volume + engagement (Saathi) + payment behavior + tenure + cross-BU presence; drives dealer development program prioritization", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-812a-9299-f0801068b046", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8148-a71b-dbe81c3b2732", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816c-88de-dd62a2689691", "Field Name": "Dealer GSTIN", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": [], "Description": "Dealer's Goods and Services Tax Identification Number; the regulatory tax ID for the dealer entity", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8190-ba50-f03de70264a4", "Field Name": "Dealer Voice Capture (Saathi)", "Availability": "Unavailable", "Format": "Audio", "Ownership": "Captured", "Source System": "Saathi App", "Gap Type": ["New Data Capture (Net-new)", "Unstructured → Structured"], "Description": "Raw voice + transcript artifact captured by TBMs in Saathi App after dealer visits; primary capture mode is Voice Note (free-form, unstructured) to preserve colloquial nuance, vernacular phrasing, and compositional intelligence that a Voice AI Agent's question-answer structure would flatten; Voice AI Agent surface available as optional secondary mode for specific structured workflows (e.g., new-TBM onboarding, scheme-objection capture). Raw audio is the primary persisted artifact; transcript is derived.", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ad-b22d-e8663c9b9fea", "Field Name": "Dealer Key Contacts", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Saathi App", "Gap Type": ["New Data Capture (Net-new)"], "Description": "Key human contacts at the dealer: primary contact, decision-maker, accounts person, family relationships, successor (where applicable); net-new capture by TBMs in Saathi, structured form + free voice notes supported", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81dd-b810-de1c23ed8aef", "Field Name": "Dealer Geo-Location (Lat / Lng)", "Availability": "Partial", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": ["Master Data Quality"], "Description": "Latitude and longitude coordinates for the dealer's primary location; used for farmer-reach proxy analysis, territory mapping, and route optimization", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e0-be78-cb83498bad54", "Field Name": "Dealer Credit Terms", "Availability": "Available", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "SAP — Customer / Dealer Master", "Gap Type": [], "Description": "Dealer's credit terms with SFS: credit limit, payment terms (days), current outstanding balance, ageing buckets; basis for credit-risk dimension of dealer tier algorithm", "Related Use Cases": ["362c3907-070c-813d-b5a0-c1f1e488f558", "362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-8148-a71b-dbe81c3b2732", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8115-8ce8-dc4fb2cbc043", "Field Name": "TBM Visit Count (Period)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Number of dealer visits per TBM per period (week / month / quarter); the basic activity-volume metric for the dashboard", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-815a-bacc-db48372d4dea", "Field Name": "TBM Time Allocation Analysis", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Decomposition of TBM time by activity type, dealer tier, BU, and call type; surfaces patterns like 'TBM X spends 70% of time on Bronze dealers' or 'TBM Y spends 50% on complaint calls'; basis for coaching interventions", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816a-982c-e88a9cd9b81b", "Field Name": "Dealer Coverage % (Tier-Weighted)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "% of assigned dealers visited within tier-appropriate cadence; e.g., Platinum dealers expected every 15 days, Gold every 30, Silver every 45, Bronze every 60; surfaces 'X Gold-tier dealers haven't been visited in 45+ days' alerts", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a5-9aec-c750d8ccf44c", "Field Name": "Activity-Outcome Correlation", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Correlation analysis between activity patterns (visit cadence, call type mix, time allocation) and sales outcomes (primary sales, secondary sales, scheme participation, dealer tier movement); identifies high-leverage activity patterns from top-performing TBMs", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81b9-aa17-f6b0f68d8bc0", "Field Name": "Call Type Classification", "Availability": "Unavailable", "Format": "String", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Tagging / Classification", "Unstructured → Structured"], "Description": "Classification of each TBM-dealer interaction into activity type: sales / scheme / complaint / collection / discovery / training (taxonomy TBD with Sales leadership); derived from LLM extraction of Dealer Voice Capture transcripts + TBM-confirmed labels", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635", "362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ca-bf07-e445098c8a6b", "Field Name": "TBM Visit Log", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Captured", "Source System": "Saathi App", "Gap Type": ["Master Data Quality", "New Data Capture (Net-new)"], "Description": "Per-visit record capturing dealer code, timestamp in/out (geo-fenced check-in), duration, call type (derived from voice transcript), outcome, action items; bundled multi-field record reconciling Saathi check-in + voice capture metadata", "Related Use Cases": ["362c3907-070c-8196-b21c-cfa8eaed134e", "362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8110-8d31-d234632b0813", "Field Name": "Discount Calculation (per Dealer × Scheme × Quantity)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Applies discount slab logic from scheme definition to a quantity (hypothetical query or actual transaction); returns expected discount %, absolute discount value, claim amount, slab band. Surfaces 'what's my best deal' optimization across stacked schemes (if stacking is permitted).", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8123-8811-e1367f363d0a", "Field Name": "Chatbot Query Log", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Saathi App", "Gap Type": ["Analytics / Dashboard Layer", "New Data Capture (Net-new)"], "Description": "Audit log of every chatbot interaction: text/voice query, user (TBM ID or Dealer Code), language, timestamp, chatbot answer, confidence score, cited circular passages, user feedback (helpful / not helpful / escalated to Commercial Team). Feeds the learning loop for circular ambiguity detection and high-frequency question surfacing.", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-814b-a5eb-c5f65745369f", "Field Name": "Chatbot Answer Confidence Score", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Process / Governance"], "Description": "Per-answer chatbot confidence score (0–1); below threshold triggers escalation pattern ('I'm not certain about this — please contact your Commercial Team representative'). Conservative threshold critical because scheme errors have material financial impact (claim rejections, dealer trust damage).", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-815d-86c5-c9487eed92af", "Field Name": "Scheme Circular Document", "Availability": "Available", "Format": "PDF", "Ownership": "Owned", "Source System": "Internal Docs (PDF / Circulars)", "Gap Type": ["Process / Governance", "System Integration", "Unstructured → Structured"], "Description": "Raw scheme circular PDF as issued by HO (or regional authority); the legal source of truth for scheme terms. Metadata captured alongside: BU, issuing authority, scope (national / regional / BU-specific / tier-specific / SKU-specific), validity start/end, supersession (which prior circulars are replaced), version, issue date.", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8196-b240-cce2d655ac63", "Field Name": "Top Scheme Questions (Aggregated)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Frequency analysis of query types over rolling periods; identifies (a) high-volume FAQ candidates for proactive content surfaces; (b) high-question schemes that may indicate over-complexity needing scheme-design simplification.", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81de-87e6-da83c810e9db", "Field Name": "Circular Ambiguity Detection", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Process / Governance"], "Description": "Periodic analysis of low-confidence query patterns surfaces specific circular clauses that are ambiguous and need clarification in next revision. Also detects gaps between formal documentation (circulars) and operational reality (what dealers actually ask) — surfaces undocumented practices that need governance attention.", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81ea-9a4a-d04cf05dc3ae", "Field Name": "Scheme Eligibility Result (per Dealer × Scheme)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Real-time evaluation per query: combines Scheme Definition rules + Dealer attributes (tier, region, BU, historical participation, YTD purchase) → returns eligible / not eligible / partial / conditional. Surfaced to chatbot user with explanation of which criteria are met / unmet.", "Related Use Cases": ["362c3907-070c-812a-9299-f0801068b046"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-810e-86a3-fb612b7a13be", "Field Name": "TBM Conversation Quality Score (per Dimension)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Unstructured → Structured"], "Description": "Per-TBM per-dimension score derived from LLM analysis of voice captures against the Conversation Quality Framework rubrics. Surfaces strengths (high scores) and gaps (low scores). Surfaced to RBM with cohort-anonymized peer comparison; raw scores not shown to TBM directly — RBM contextualizes.", "Related Use Cases": ["362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8149-9651-e6825e088297", "Field Name": "AI-Generated Coaching Recommendation", "Availability": "Unavailable", "Format": "Text (Long)", "Ownership": "Uncaptured", "Source System": "Conversational AI Surface", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "LLM-generated specific coaching prompts grounded in (a) actual voice excerpts from the TBM's recent captures, (b) activity patterns, (c) peer benchmark gaps. Format: 'In your last 12 Platinum visits, you spent <5 min on cross-sell. Top-decile peers spend 12+ min. Here's an excerpt from your visit on [date]: [quote]. Consider asking: [example questions].' Routed to RBM, not directly to TBM.", "Related Use Cases": ["362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8162-bb60-fc0c5a0b6586", "Field Name": "Coaching Action Item Tracking", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Saathi App", "Gap Type": ["Analytics / Dashboard Layer", "New Data Capture (Net-new)"], "Description": "Per-coaching-cycle action items captured by RBM after coaching conversation (e.g., 'try discovery questions on next 5 Platinum visits', 'use Should-Cost framing on price-objection calls'). Completion status detected from subsequent voice captures (LLM checks whether TBM actually attempted the technique) or RBM confirmation in next 1:1. Closes the coaching feedback loop.", "Related Use Cases": ["362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8177-b177-c41070112525", "Field Name": "Peer Benchmark (Anonymized Cohort)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Process / Governance"], "Description": "TBM's metrics positioned against anonymized peer cohort matched by region, BU, and tenure. Surfaces percentile or band ('30th percentile on cross-sell time') rather than individual public ranking ('behind TBM X'). Designed to motivate growth without triggering competitive resentment.", "Related Use Cases": ["362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-818d-8962-e904dc836b63", "Field Name": "Conversation Quality Framework", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Net-new Definition Required", "Process / Governance", "Taxonomy Build"], "Description": "Foundational coaching taxonomy: defines coachable dimensions of TBM-dealer conversations — e.g., discovery quality, cross-sell attempts, objection-handling pattern, closing technique, scheme-explanation accuracy, empathy / relationship signals. Includes scoring rubrics and example markers per dimension. Workshop-driven definition with L&D + RBMs + Sales Head.", "Related Use Cases": ["362c3907-070c-8131-8246-d0b70feba635"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8148-a6f6-fc4725085859", "Field Name": "Dealer Cross-BU Revenue Aggregation", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Per-dealer total SFS revenue aggregated across Seeds + CP + SPN over rolling periods, with BU-mix breakdown. The core rollup that everything else in UC #12 depends on. Requires cross-BU dealer code reconciliation (UC #10 prerequisite) to aggregate correctly.", "Related Use Cases": ["362c3907-070c-8184-84b8-c8eba006a29a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-819f-8d4b-c43f46f49830", "Field Name": "Product Launch Cross-BU Impact Analysis", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Post-launch tracking of revenue change at affected dealers vs. matched control cohort; surfaces (a) incremental growth (launch grew dealer's total SFS wallet), (b) cannibalization (launch shifted dollars from another SFS BU at same dealer), (c) net impact on cross-BU portfolio. Avoids over-interpretation by surfacing patterns descriptively rather than asserting causation.", "Related Use Cases": ["362c3907-070c-8184-84b8-c8eba006a29a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81b5-9946-d963580d815a", "Field Name": "Product Hierarchy (Cross-BU Unified)", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "SAP — Material Master", "Gap Type": ["Master Data Quality", "Net-new Definition Required", "Taxonomy Build"], "Description": "Unified cross-BU product taxonomy: BU → category → sub-category → SKU mapping that lets cross-BU rollups, cross-sell analysis, and cannibalization detection work consistently across Seeds / CP / SPN. Likely doesn't exist today as a unified taxonomy — each BU has its own.", "Related Use Cases": ["362c3907-070c-8184-84b8-c8eba006a29a", "362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81dd-b856-c6314d7f1c31", "Field Name": "Cross-Sell Opportunity Score (per Dealer × BU)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "For each dealer × BU they don't currently carry, computed opportunity score combining: (a) rules-based signals (dealer has adjacent BUs, sufficient scale, geography supports it), (b) pattern-based signals (similar dealers in similar territories carry this BU successfully). Surfaced to Sales Head + RBMs for proactive cross-sell campaigns.", "Related Use Cases": ["362c3907-070c-8184-84b8-c8eba006a29a"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8118-8e38-f17dccf58f1d", "Field Name": "Warehouse / Plant Code", "Availability": "Available", "Format": "String", "Ownership": "Owned", "Source System": "SAP — Stock / Inventory", "Gap Type": [], "Description": "Unique identifier for each SFS-owned warehouse / plant; primary key for stock aggregation, allocation, and dispatch decisions", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-812b-9de5-edbbcb02f7e2", "Field Name": "In-Transit Stock", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Logistics System", "Gap Type": ["Analytics / Dashboard Layer", "System Integration"], "Description": "Stock dispatched from a warehouse but not yet received at destination (in flight); currently visible in fragments across SAP + Logistics System but not consolidated. Bundled multi-field: SKU, quantity, source warehouse, destination, dispatch date, expected arrival, carrier / vehicle.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Logistics", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8146-bace-f12296e06dd6", "Field Name": "SKU Substitution Mapping", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "SAP — Material Master", "Gap Type": ["Master Data Quality", "Net-new Definition Required"], "Description": "Mapping of which SKUs are acceptable substitutes for each other; supports 'if primary SKU out of stock, suggest substitute' workflow in Saathi at order entry. Net-new asset requiring workshop-driven definition with Product Marketing + Sales.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-816e-94c9-fc3fbe5cee90", "Field Name": "Stock Quantity (per SKU × Warehouse)", "Availability": "Available", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Stock / Inventory", "Gap Type": ["Analytics / Dashboard Layer", "System Integration"], "Description": "Real-time stock-on-hand per SKU per SFS-owned warehouse; the core inventory data point surfaced to TBMs at order entry", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81c8-94b9-d6eb95092883", "Field Name": "Stock Batch / Expiry Date (per SKU × Warehouse × Batch)", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "SAP — Stock / Inventory", "Gap Type": ["Master Data Quality"], "Description": "Batch-level stock records with expiry dates per SKU per warehouse; basis for FEFO (first-expiry-first-out) allocation and expiry-risk dashboard. Bundled multi-field: batch number, manufacture date, expiry date, quantity in batch.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e0-a8cf-c235c1c1383d", "Field Name": "Vendor / External Warehouse Stock", "Availability": "Partial", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "Vendor / External Warehouse System", "Gap Type": ["Master Data Quality", "System Integration"], "Description": "Stock-on-hand per SKU at vendor / external warehouse locations (3PL, contract manufacturers, distribution partners holding SFS inventory); bundled multi-field: vendor location, SKU, quantity, last-updated timestamp, data source (API / CSV / Excel)", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Logistics", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81fa-ae66-df672419f04b", "Field Name": "Warehouse Location (Lat / Lng)", "Availability": "Partial", "Format": "Numeric", "Ownership": "Owned", "Source System": "SAP — Stock / Inventory", "Gap Type": ["Master Data Quality"], "Description": "Latitude and longitude coordinates for each warehouse; used for distance-to-dealer routing and recommended source warehouse logic", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-811e-aa71-c278af956e18", "Field Name": "Recommended Source Warehouse (per Order)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Optimization output recommending which warehouse should fulfill a given dealer order, combining: dealer location, multi-source stock availability (SFS + vendor + in-transit), expiry status (FEFO), and cost-to-serve (geography). Surfaced to TBM at order entry with rationale and alternatives.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8151-ade0-d3bda6fe23cd", "Field Name": "Low-Stock Alert Flag (per SKU × Warehouse)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Boolean flag triggered when stock-on-hand per SKU at a warehouse drops below threshold; routes to Dispatch Planner + RBM for replenishment action; supports pre-emptive 'your dealers typically buy this SKU — stock is low' alerts to relevant TBMs.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8165-92bd-d44e8d14bc06", "Field Name": "Expiry-Risk Stock View", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Aggregated view of stock approaching expiry (e.g., <90 days remaining for Seeds, <60 days for CP, category-specific buffers); feeds Commercial Team for proactive liquidation scheme design (links to UC #9 Scheme Chatbot). Surfaces SKU × warehouse × quantity × days-to-expiry combinations needing action.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e6-afa1-c77df103f2b1", "Field Name": "Stock Source Freshness / Staleness Indicator", "Availability": "Unavailable", "Format": "String", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer", "Process / Governance"], "Description": "Per-stock-record metadata flag indicating data freshness: 'Live' (real-time SAP query), 'Updated N minutes ago' (cached snapshot), 'Updated N hours / days ago' (vendor CSV / Excel feed), 'Stale — verify before committing' (freshness exceeds threshold). Critical UX element so TBMs don't over-commit on stale data, especially for vendor warehouse stock with variable refresh cadence.", "Related Use Cases": ["362c3907-070c-8135-aed0-fadc66a03638"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8104-a06b-d3e69daedcec", "Field Name": "Sales Decline Trajectory (per Dealer)", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Per-dealer rolling-window trend in order frequency + volume (3/6/12-month windows); surfaces directional change beyond point-in-time low values. A dealer with stable low volume is different from a dealer in rapid decline — trajectory captures the difference.", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-811f-a201-f320cfac2095", "Field Name": "Intervention Tracking Log", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Saathi App", "Gap Type": ["Analytics / Dashboard Layer", "New Data Capture (Net-new)"], "Description": "Per-risk-event intervention record: triggered date, TBM action taken, RBM escalation if any, Central Finance involvement if any, outcome (recovered / improved / continued decline / churned), captured-via-voice notes. Closes the learning loop — feeds back into model effectiveness measurement.", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Internal Apps", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8174-99b6-c10cadb4f2f5", "Field Name": "Dealer GSTIN Registration Status", "Availability": "Unavailable", "Format": "String", "Ownership": "Sourced", "Source System": "GST Portal (via GSP)", "Gap Type": ["External Sourcing", "System Integration"], "Description": "Dealer's GST registration status pulled from GST Portal via GSP: Active / Cancelled / Suspended / Provisional. Inactive dealer GSTIN is a high-severity churn signal (and credit hold trigger). Refreshed monthly with daily delta updates.", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81b2-a503-e43a59b99d62", "Field Name": "Churn Risk Factor Breakdown", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Per-dealer breakdown of which factors are driving the churn risk score and by how much; supports the CSV's 'contributing-factor breakdown' requirement. Surfaces 'order frequency dropped 40% (contributing 25 pts), three complaint calls in voice captures (contributing 18 pts), GST filing missed (contributing 15 pts), scheme non-participation in last 2 cycles (contributing 12 pts)'. Routes specific intervention guidance per factor.", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81d3-95ec-d3b7bc982fb5", "Field Name": "Dealer GST Default Flag", "Availability": "Unavailable", "Format": "Boolean", "Ownership": "Sourced", "Source System": "GST Portal (via GSP)", "Gap Type": ["External Sourcing", "System Integration"], "Description": "Boolean flag indicating dealer has missed N consecutive GST returns (threshold TBD with Finance / Compliance). Strong churn risk signal; also a Central Finance credit hold trigger. Routes to Central Finance + Sales (distinct from UC #5's vendor-side routing).", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "External (Risk/Compliance)", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81e2-8236-fdd7972fd354", "Field Name": "Dealer Churn Risk Score", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Weighted composite churn risk score (0–100) per dealer combining: sales decline trajectory, scheme participation drop, complaint call frequency, payment behavior, GST default signals, voice sentiment shifts. Refreshed monthly. Tier-specific weighting (Platinum churn weighted differently than Bronze). Threshold crossing triggers intervention workflow.", "Related Use Cases": ["362c3907-070c-8148-a71b-dbe81c3b2732"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8117-bee9-d657ffc532a4", "Field Name": "Enterprise Metrics Dictionary", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Master Data Quality", "Net-new Definition Required", "Process / Governance", "Taxonomy Build"], "Description": "Curated dictionary of every leadership-review metric: definition, formula, source system(s), join semantics, owner / steward, version, validity period. The foundational asset that prevents KPI definition drift across the org. Without it, the chat surface is just a SQL frontend that hallucinates inconsistent answers depending on which team's definition wins.", "Related Use Cases": ["362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-8123-9d9d-cc8488daabf1", "Field Name": "'What Changed' Weekly Digest", "Availability": "Unavailable", "Format": "Computed / Derived", "Ownership": "Uncaptured", "Source System": "Internal Computed / Derived", "Gap Type": ["Analytics / Dashboard Layer"], "Description": "Auto-generated weekly digest of top 5 metrics moving against trend; pushed proactively to leadership (BH / CFO / Sales Head). Anomaly scoring on Enterprise Metrics Dictionary's tracked metrics surfaces directional changes leadership should know about before they ask.", "Related Use Cases": ["362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81a0-b7c0-f45f21ecad25", "Field Name": "Assistant Query Log", "Availability": "Unavailable", "Format": "Mixed (Multi-field)", "Ownership": "Uncaptured", "Source System": "Conversational AI Surface", "Gap Type": ["Analytics / Dashboard Layer", "New Data Capture (Net-new)"], "Description": "Audit log of every leadership query to the Enterprise Assistant: text query, user, timestamp, assistant answer, cited metric(s) + definition version, confidence score, chart generated, user feedback (helpful / not / escalated). Same audit-log pattern as UC #9's Chatbot Query Log. Feeds intent library refinement + repeated-question detection (candidates for pre-built dashboards).", "Related Use Cases": ["362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "Computed / Derived", "_descriptionSource": "notion", "_metadataSource": "csv"}, {"id": "362c3907-070c-81bb-9e5d-e46b9b6b26f0", "Field Name": "SAP — Financials Extracts (Working Capital / Receivables / GL)", "Availability": "Available", "Format": "Mixed (Multi-field)", "Ownership": "Owned", "Source System": "SAP — Financials (GL/P&L)", "Gap Type": ["System Integration"], "Description": "Bundled multi-field extract from SAP Financials covering P&L lines, GL accounts, working capital metrics, receivables ageing, collections records, and balance sheet items needed for leadership-level financial reporting. First-time use of SAP — Financials module in the schema; kept bundled for v1 pending discovery of SFS's actual financial chart-of-accounts structure.", "Related Use Cases": ["362c3907-070c-819a-a256-c13f2ca414e2"], "Source Group": "SAP", "_descriptionSource": "notion", "_metadataSource": "csv"}], "sourceGroups": ["SAP", "Internal Apps", "Logistics", "External (Risk/Compliance)", "External (Market Data)", "Voice / Capture", "Computed / Derived"]};
+
+// ---------- Color tables ----------
+const THEME_COLOR = {
+  "Procurement": "var(--theme-procurement)",
+  "Field Force + Salesforce": "var(--theme-field)",
+  "Enterprise Assistant": "var(--theme-enterprise)",
+};
+const THEME_RGB = {
+  "Procurement": "#f59e0b",
+  "Field Force + Salesforce": "#34d399",
+  "Enterprise Assistant": "#a78bfa",
+};
+const SOURCE_COLOR = {
+  "SAP": "#fb923c",
+  "Internal Apps": "#4ade80",
+  "Logistics": "#c084fc",
+  "External (Risk/Compliance)": "#f87171",
+  "External (Market Data)": "#38bdf8",
+  "Voice / Capture": "#f472b6",
+  "Computed / Derived": "#94a3b8",
+  "Other": "#64748b"
+};
+const AV_COLOR = {
+  "Available": "#22c55e",
+  "Partial": "#facc15",
+  "Unavailable": "#ef4444",
+  "TBC": "#64748b"
+};
+const FORMAT_COLOR = {
+  "String": "#60a5fa",
+  "Numeric": "#fb923c",
+  "Date / Datetime": "#4ade80",
+  "Boolean": "#facc15",
+  "Text (Long)": "#94a3b8",
+  "Mixed (Multi-field)": "#a78bfa",
+  "PDF": "#f472b6",
+  "Image": "#f472b6",
+  "Audio": "#f472b6",
+  "Computed / Derived": "#94a3b8",
+};
+
+// ---------- State ----------
+const state = {
+  filters: {
+    theme: new Set(),
+    sourceGroup: new Set(),
+    availability: new Set(),
+    format: new Set(),
+    primaryUser: "",
+    system: "",
+    gapType: "",
+    search: ""
+  },
+  colorMode: "category",
+  showLabels: false,
+  highlightShared: true,
+  selected: null,
+  hover: null,
+};
+
+// ---------- Build graph ----------
+const ucById = new Map(DATA.useCases.map(u => [u.id, u]));
+const dfById = new Map(DATA.dataFields.map(d => [d.id, d]));
+
+const nodes = [
+  ...DATA.useCases.map(u => ({
+    id: u.id,
+    kind: "uc",
+    label: u.Name,
+    theme: u.Theme,
+    buildMode: u["Build Mode"],
+    status: u["Discovery Status"],
+    headline: u.Headline,
+    primaryUsers: u["Primary Users"] || [],
+    secondaryUsers: u["Secondary Users"] || [],
+    systems: u["Internal Systems Touched"] || [],
+    gapTypes: u["Data Gap Types"] || [],
+    externalSources: u["External Data Sources Needed"] || [],
+    dataFields: u["Data Fields"] || [],
+    raw: u
+  })),
+  ...DATA.dataFields.map(d => ({
+    id: d.id,
+    kind: "df",
+    label: d["Field Name"],
+    availability: d.Availability,
+    format: d.Format,
+    ownership: d.Ownership,
+    source: d["Source System"],
+    sourceGroup: d["Source Group"],
+    gapTypes: d["Gap Type"] || [],
+    description: d.Description,
+    relatedUseCases: d["Related Use Cases"] || [],
+    inferred: d._metadataSource === "inferred",
+    raw: d
+  }))
+];
+
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+const links = [];
+DATA.useCases.forEach(u => {
+  (u["Data Fields"] || []).forEach(fid => {
+    if (nodeById.has(fid)) {
+      links.push({ source: u.id, target: fid });
+    }
+  });
+});
+
+// Count incoming connections per field
+const fieldDegree = new Map();
+links.forEach(l => fieldDegree.set(l.target, (fieldDegree.get(l.target) || 0) + 1));
+
+// Collect distinct primary users, systems, gap types
+const allPrimaryUsers = Array.from(new Set(DATA.useCases.flatMap(u => u["Primary Users"] || []))).sort();
+const allSystems = Array.from(new Set(DATA.useCases.flatMap(u => u["Internal Systems Touched"] || []))).sort();
+const allGapTypes = Array.from(new Set([
+  ...DATA.useCases.flatMap(u => u["Data Gap Types"] || []),
+  ...DATA.dataFields.flatMap(d => d["Gap Type"] || [])
+])).sort();
+
+// ---------- Helpers ----------
+function nodeColor(n) {
+  if (n.kind === "uc") return THEME_RGB[n.theme] || "#999";
+  if (state.colorMode === "availability") return AV_COLOR[n.availability] || "#666";
+  if (state.colorMode === "format") return FORMAT_COLOR[n.format] || "#666";
+  return SOURCE_COLOR[n.sourceGroup] || SOURCE_COLOR.Other;
+}
+function nodeRadius(n) {
+  if (n.kind === "uc") return 14;
+  const deg = fieldDegree.get(n.id) || 1;
+  return 4 + Math.min(deg, 8) * 0.9;
+}
+
+function passes(n) {
+  // UC filters
+  if (state.filters.theme.size && n.kind === "uc" && !state.filters.theme.has(n.theme)) return false;
+  // Field filters
+  if (state.filters.sourceGroup.size && n.kind === "df" && !state.filters.sourceGroup.has(n.sourceGroup)) return false;
+  if (state.filters.availability.size && n.kind === "df" && !state.filters.availability.has(n.availability)) return false;
+  if (state.filters.format.size && n.kind === "df" && !state.filters.format.has(n.format)) return false;
+
+  // Primary user filter narrows UCs and (transitively) their data fields
+  if (state.filters.primaryUser) {
+    if (n.kind === "uc" && !(n.primaryUsers || []).includes(state.filters.primaryUser)) return false;
+    if (n.kind === "df") {
+      const linkedUCs = n.relatedUseCases.map(id => nodeById.get(id)).filter(Boolean);
+      if (!linkedUCs.some(u => (u.primaryUsers || []).includes(state.filters.primaryUser))) return false;
+    }
+  }
+  if (state.filters.system) {
+    if (n.kind === "uc" && !(n.systems || []).includes(state.filters.system)) return false;
+    if (n.kind === "df") {
+      const linkedUCs = n.relatedUseCases.map(id => nodeById.get(id)).filter(Boolean);
+      if (!linkedUCs.some(u => (u.systems || []).includes(state.filters.system))) return false;
+    }
+  }
+  if (state.filters.gapType) {
+    if (n.kind === "uc" && !(n.gapTypes || []).includes(state.filters.gapType)) return false;
+    if (n.kind === "df" && !(n.gapTypes || []).includes(state.filters.gapType)) return false;
+  }
+  if (state.filters.search) {
+    const q = state.filters.search.toLowerCase();
+    if (!n.label.toLowerCase().includes(q)) return false;
+  }
+  return true;
+}
+
+// ---------- SVG setup ----------
+const svg = d3.select("#graph");
+const tooltip = d3.select("#tooltip");
+const container = svg.append("g").attr("class", "viewport");
+
+const linkSel = container.append("g").attr("class", "links").attr("stroke", "var(--link)").attr("stroke-opacity", 1);
+const nodeSel = container.append("g").attr("class", "nodes");
+const labelSel = container.append("g").attr("class", "labels");
+
+let linkEls, nodeEls, labelEls;
+
+const sim = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.source.kind === "uc" ? 70 : 60).strength(0.4))
+  .force("charge", d3.forceManyBody().strength(d => d.kind === "uc" ? -380 : -90))
+  .force("collide", d3.forceCollide(d => nodeRadius(d) + 4))
+  .force("center", d3.forceCenter())
+  .alpha(1).alphaDecay(0.025);
+
+function render() {
+  linkEls = linkSel.selectAll("line").data(links, d => `${d.source.id || d.source}-${d.target.id || d.target}`);
+  linkEls.exit().remove();
+  linkEls = linkEls.enter().append("line")
+    .attr("class", "link")
+    .attr("stroke-width", 0.9)
+    .merge(linkEls);
+
+  nodeEls = nodeSel.selectAll("g").data(nodes, d => d.id);
+  nodeEls.exit().remove();
+  const nodeEnter = nodeEls.enter().append("g")
+    .attr("class", "node")
+    .style("cursor", "pointer")
+    .on("mouseenter", function(ev, d) { hoverNode(d); })
+    .on("mouseleave", function() { unhover(); })
+    .on("click", function(ev, d) { ev.stopPropagation(); selectNode(d); })
+    .call(d3.drag()
+      .on("start", (ev, d) => { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag", (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+      .on("end", (ev, d) => { if (!ev.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  // Use cases = rounded squares, fields = circles
+  nodeEnter.each(function(d) {
+    const g = d3.select(this);
+    if (d.kind === "uc") {
+      const r = nodeRadius(d);
+      g.append("rect")
+        .attr("x", -r).attr("y", -r)
+        .attr("width", r * 2).attr("height", r * 2)
+        .attr("rx", 4).attr("ry", 4)
+        .attr("fill", nodeColor(d))
+        .attr("stroke", "var(--node-stroke)")
+        .attr("stroke-width", 2);
+      // small uc number label
+      const num = d.label.match(/^(\d+)\./);
+      if (num) {
+        g.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.32em")
+          .attr("font-size", "10px")
+          .attr("font-family", "JetBrains Mono, monospace")
+          .attr("font-weight", "700")
+          .attr("fill", "var(--inner-text)")
+          .text(num[1]);
+      } else {
+        g.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.32em")
+          .attr("font-size", "9px")
+          .attr("font-family", "JetBrains Mono, monospace")
+          .attr("font-weight", "700")
+          .attr("fill", "var(--inner-text)")
+          .text("ECA");
+      }
+    } else {
+      g.append("circle")
+        .attr("r", nodeRadius(d))
+        .attr("fill", nodeColor(d))
+        .attr("stroke", "var(--node-stroke)")
+        .attr("stroke-width", 1.2);
+    }
+  });
+  nodeEls = nodeEnter.merge(nodeEls);
+
+  // Labels (only for UCs by default, fields toggleable)
+  labelEls = labelSel.selectAll("text").data(nodes, d => d.id);
+  labelEls.exit().remove();
+  const labelEnter = labelEls.enter().append("text")
+    .attr("class", d => "label node-label" + (d.kind === "uc" ? " large" : ""))
+    .attr("text-anchor", "middle");
+  labelEls = labelEnter.merge(labelEls);
+  labelEls.text(d => {
+    if (d.kind === "uc") {
+      // Show just the part after "N. " for cleaner labels
+      return d.label.replace(/^\d+\.\s*/, "").substring(0, 28);
+    }
+    return d.label.substring(0, 32);
+  });
+
+  sim.nodes(nodes);
+  sim.force("link").links(links);
+  sim.alpha(0.7).restart();
+
+  applyFilters();
+}
+
+sim.on("tick", () => {
+  if (!linkEls || !nodeEls) return;
+  linkEls
+    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  nodeEls.attr("transform", d => `translate(${d.x},${d.y})`);
+  labelEls
+    .attr("x", d => d.x)
+    .attr("y", d => d.y - nodeRadius(d) - 5);
+});
+
+// ---------- Hover & select ----------
+function hoverNode(d) {
+  state.hover = d;
+  const neighborIds = new Set([d.id]);
+  links.forEach(l => {
+    if (l.source.id === d.id) neighborIds.add(l.target.id);
+    if (l.target.id === d.id) neighborIds.add(l.source.id);
+  });
+  nodeEls.classed("dim", n => !neighborIds.has(n.id));
+  nodeEls.classed("highlight", n => n.id === d.id);
+  linkEls
+    .classed("dim", l => !(l.source.id === d.id || l.target.id === d.id))
+    .classed("highlight", l => (l.source.id === d.id || l.target.id === d.id));
+  labelEls.classed("dim", n => !neighborIds.has(n.id));
+
+  // Tooltip
+  const rect = svg.node().getBoundingClientRect();
+  tooltip
+    .style("left", (d.x + rect.left + 14) + "px")
+    .style("top", (d.y + rect.top - 8) + "px")
+    .classed("visible", true)
+    .html(tooltipHTML(d));
+}
+function unhover() {
+  state.hover = null;
+  if (!state.selected) {
+    nodeEls.classed("dim", false).classed("highlight", false);
+    linkEls.classed("dim", false).classed("highlight", false);
+    labelEls.classed("dim", false);
+  } else {
+    highlightSelected();
+  }
+  tooltip.classed("visible", false);
+}
+
+function tooltipHTML(d) {
+  if (d.kind === "uc") {
+    return `
+      <div class="ttitle">${escape(d.label)}</div>
+      <div class="tmeta">${d.theme} · ${d.dataFields.length} fields</div>
+    `;
+  }
+  return `
+    <div class="ttitle">${escape(d.label)}</div>
+    <div class="tmeta">${d.source} · ${d.availability} · used by ${d.relatedUseCases.length}</div>
+  `;
+}
+function escape(s) { return String(s).replace(/[<>&"]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;","\"":"&quot;"}[c])); }
+
+function selectNode(d) {
+  state.selected = d;
+  highlightSelected();
+  renderDetail(d);
+}
+function highlightSelected() {
+  if (!state.selected) return;
+  const d = state.selected;
+  const neighborIds = new Set([d.id]);
+  links.forEach(l => {
+    if (l.source.id === d.id) neighborIds.add(l.target.id);
+    if (l.target.id === d.id) neighborIds.add(l.source.id);
+  });
+  nodeEls.classed("dim", n => !neighborIds.has(n.id));
+  nodeEls.classed("highlight", n => n.id === d.id);
+  linkEls
+    .classed("dim", l => !(l.source.id === d.id || l.target.id === d.id))
+    .classed("highlight", l => (l.source.id === d.id || l.target.id === d.id));
+  labelEls.classed("dim", n => !neighborIds.has(n.id));
+}
+
+svg.on("click", () => {
+  state.selected = null;
+  nodeEls.classed("dim", false).classed("highlight", false);
+  linkEls.classed("dim", false).classed("highlight", false);
+  labelEls.classed("dim", false);
+  renderDetail(null);
+});
+
+// ---------- Detail panel ----------
+function renderDetail(d) {
+  const panel = document.getElementById("detail-panel");
+  if (!d) {
+    panel.innerHTML = `<div class="panel-empty">SELECT A NODE TO INSPECT</div>`;
+    return;
+  }
+  if (d.kind === "uc") {
+    const themeColor = THEME_RGB[d.theme] || "#999";
+    panel.innerHTML = `
+      <div class="detail-type usecase">Use Case</div>
+      <div class="detail-title">${escape(d.label)}</div>
+      <div class="detail-headline">${escape(d.headline || "")}</div>
+
+      <div class="detail-prop">
+        <div class="detail-label">Theme</div>
+        <div class="detail-tags"><span class="detail-tag themed" style="background:${themeColor};">${escape(d.theme)}</span></div>
+      </div>
+      <div class="detail-prop">
+        <div class="detail-label">Build Mode · Status</div>
+        <div class="detail-value">${escape(d.buildMode)} · ${escape(d.status)}</div>
+      </div>
+      ${listProp("Primary Users", d.primaryUsers)}
+      ${listProp("Secondary Users", d.secondaryUsers)}
+      ${listProp("Internal Systems Touched", d.systems)}
+      ${listProp("Data Gap Types", d.gapTypes)}
+      ${listProp("External Data Sources Needed", d.externalSources)}
+
+      <div class="detail-section">
+        <div class="detail-section-title">Connected Data Fields · ${d.dataFields.length}</div>
+        <div class="connected-list">
+          ${d.dataFields.map(fid => {
+            const f = nodeById.get(fid); if (!f) return "";
+            const c = SOURCE_COLOR[f.sourceGroup] || "#666";
+            return `<div class="connected-item" data-id="${f.id}">
+              <span class="swatch" style="background:${c}"></span>
+              <span class="name">${escape(f.label)}</span>
+              <span class="meta">${escape(f.source)}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  } else {
+    const c = SOURCE_COLOR[d.sourceGroup] || "#666";
+    panel.innerHTML = `
+      <div class="detail-type field">Data Field</div>
+      <div class="detail-title">${escape(d.label)}</div>
+      ${d.description ? `<div class="detail-headline">${escape(d.description)}</div>` : ""}
+
+      <div class="detail-prop">
+        <div class="detail-label">Source System · Group</div>
+        <div class="detail-value">
+          <span class="detail-tag themed" style="background:${c};color:#0b0d12;">${escape(d.sourceGroup)}</span>
+          <span class="detail-tag">${escape(d.source)}</span>
+        </div>
+      </div>
+      <div class="detail-prop">
+        <div class="detail-label">Availability</div>
+        <div class="detail-value"><span class="av-badge av-${d.availability}"><span class="dot"></span>${escape(d.availability)}</span></div>
+      </div>
+      <div class="detail-prop">
+        <div class="detail-label">Format · Ownership</div>
+        <div class="detail-value">${escape(d.format)} · ${escape(d.ownership)}</div>
+      </div>
+      ${listProp("Gap Type", d.gapTypes)}
+      ${d.inferred ? `<div class="detail-prop"><div class="detail-label">Note</div><div class="detail-value" style="color:var(--text-faint);font-size:11px;">Description is from Notion. Source System / Availability / Format are inferred from naming patterns; verify in Notion for canonical values.</div></div>` : ""}
+
+      <div class="detail-section">
+        <div class="detail-section-title">Used By · ${d.relatedUseCases.length} use case${d.relatedUseCases.length === 1 ? "" : "s"}</div>
+        <div class="connected-list">
+          ${d.relatedUseCases.map(uid => {
+            const u = nodeById.get(uid); if (!u) return "";
+            const c = THEME_RGB[u.theme] || "#666";
+            return `<div class="connected-item" data-id="${u.id}">
+              <span class="swatch" style="background:${c}"></span>
+              <span class="name">${escape(u.label)}</span>
+              <span class="meta">${escape(u.theme)}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
+  }
+  // Wire up the connected-item clicks
+  panel.querySelectorAll(".connected-item").forEach(el => {
+    el.onclick = () => {
+      const id = el.getAttribute("data-id");
+      const n = nodeById.get(id);
+      if (n) {
+        selectNode(n);
+        // center on it
+        const t = d3.zoomIdentity.translate(width/2 - n.x*zoomScale, height/2 - n.y*zoomScale).scale(zoomScale);
+        svg.transition().duration(450).call(zoom.transform, t);
+      }
+    };
+  });
+}
+function listProp(label, items) {
+  if (!items || !items.length) return "";
+  return `<div class="detail-prop">
+    <div class="detail-label">${label}</div>
+    <div class="detail-tags">${items.map(i => `<span class="detail-tag">${escape(i)}</span>`).join("")}</div>
+  </div>`;
+}
+
+// ---------- Filters UI ----------
+function buildChips(containerId, options, filterKey, colors) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = "";
+  options.forEach(opt => {
+    const chip = document.createElement("button");
+    chip.className = "chip";
+    chip.innerHTML = `<span class="dot" style="--swatch:${colors[opt] || '#888'}"></span>${opt}`;
+    chip.onclick = () => {
+      const s = state.filters[filterKey];
+      if (s.has(opt)) s.delete(opt); else s.add(opt);
+      chip.classList.toggle("active");
+      applyFilters();
+    };
+    el.appendChild(chip);
+  });
+}
+buildChips("filter-theme", Object.keys(THEME_RGB), "theme", THEME_RGB);
+buildChips("filter-sourceGroup", DATA.sourceGroups, "sourceGroup", SOURCE_COLOR);
+buildChips("filter-availability", ["Available","Partial","Unavailable","TBC"], "availability", AV_COLOR);
+buildChips("filter-format", ["String","Numeric","Date / Datetime","Boolean","Mixed (Multi-field)","Computed / Derived","Audio","PDF"], "format", FORMAT_COLOR);
+
+// Populate selects
+function fillSelect(id, options) {
+  const el = document.getElementById(id);
+  options.forEach(o => {
+    const opt = document.createElement("option");
+    opt.value = o; opt.textContent = o;
+    el.appendChild(opt);
+  });
+}
+fillSelect("filter-primaryUser", allPrimaryUsers);
+fillSelect("filter-system", allSystems);
+fillSelect("filter-gapType", allGapTypes);
+
+document.getElementById("filter-primaryUser").onchange = e => { state.filters.primaryUser = e.target.value; applyFilters(); };
+document.getElementById("filter-system").onchange = e => { state.filters.system = e.target.value; applyFilters(); };
+document.getElementById("filter-gapType").onchange = e => { state.filters.gapType = e.target.value; applyFilters(); };
+
+document.getElementById("search").oninput = e => {
+  state.filters.search = e.target.value.trim();
+  applyFilters();
+};
+
+document.querySelectorAll(".filter-clear").forEach(btn => {
+  btn.onclick = () => {
+    const key = btn.dataset.clear;
+    if (state.filters[key] instanceof Set) {
+      state.filters[key].clear();
+      btn.parentElement.parentElement.querySelectorAll(".chip.active").forEach(c => c.classList.remove("active"));
+    } else {
+      state.filters[key] = "";
+      const sel = btn.parentElement.parentElement.querySelector("select");
+      if (sel) sel.value = "";
+    }
+    applyFilters();
+  };
+});
+
+document.getElementById("color-mode").onchange = e => {
+  state.colorMode = e.target.value;
+  // Update fill on field nodes
+  nodeEls.filter(d => d.kind === "df").select("circle").transition().duration(200).attr("fill", d => nodeColor(d));
+};
+
+document.getElementById("toggle-labels").onclick = function() {
+  state.showLabels = !state.showLabels;
+  this.classList.toggle("on");
+  labelEls.style("display", d => {
+    if (d.kind === "uc") return null;
+    return state.showLabels ? null : "none";
+  });
+};
+document.getElementById("toggle-shared").onclick = function() {
+  state.highlightShared = !state.highlightShared;
+  this.classList.toggle("on");
+  applyFilters();
+};
+
+// ---------- Apply filters ----------
+function applyFilters() {
+  if (!nodeEls) return;
+
+  const visibleIds = new Set(nodes.filter(passes).map(n => n.id));
+
+  // If a UC is visible, all its fields can also be highlighted to show context
+  // But we keep filter strict - only visible ids fully visible
+
+  nodeEls
+    .style("opacity", n => visibleIds.has(n.id) ? 1 : 0.08)
+    .style("pointer-events", n => visibleIds.has(n.id) ? "auto" : "none");
+
+  // Bolder borders for "shared" data fields (used by 3+ UCs)
+  nodeEls.filter(n => n.kind === "df").selectAll("circle")
+    .attr("stroke", n => {
+      if (state.highlightShared && (fieldDegree.get(n.id) || 0) >= 4) return "var(--accent)";
+      return "var(--node-stroke)";
+    })
+    .attr("stroke-width", n => {
+      if (state.highlightShared && (fieldDegree.get(n.id) || 0) >= 4) return 2;
+      return 1.2;
+    });
+
+  linkEls
+    .style("opacity", l => (visibleIds.has(l.source.id) && visibleIds.has(l.target.id)) ? 0.85 : 0.04);
+
+  labelEls
+    .style("opacity", n => visibleIds.has(n.id) ? 1 : 0.12)
+    .style("display", d => {
+      if (!visibleIds.has(d.id)) return "none";
+      if (d.kind === "uc") return null;
+      return state.showLabels ? null : "none";
+    });
+
+  // Update stats
+  document.getElementById("stat-uc").textContent = nodes.filter(n => n.kind === "uc" && visibleIds.has(n.id)).length;
+  document.getElementById("stat-df").textContent = nodes.filter(n => n.kind === "df" && visibleIds.has(n.id)).length;
+  document.getElementById("stat-links").textContent = links.filter(l => visibleIds.has(l.source.id) && visibleIds.has(l.target.id)).length;
+}
+
+// ---------- Zoom & resize ----------
+let width = 0, height = 0;
+let zoomScale = 1;
+const zoom = d3.zoom().scaleExtent([0.2, 4]).on("zoom", ev => {
+  container.attr("transform", ev.transform);
+  zoomScale = ev.transform.k;
+});
+svg.call(zoom);
+
+document.getElementById("zoom-in").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1.4);
+document.getElementById("zoom-out").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1/1.4);
+document.getElementById("zoom-reset").onclick = () => svg.transition().duration(350).call(zoom.transform, d3.zoomIdentity.translate(width/2, height/2));
+
+function resize() {
+  const wrap = document.querySelector(".graph-wrap");
+  width = wrap.clientWidth;
+  height = wrap.clientHeight;
+  svg.attr("viewBox", [-width/2, -height/2, width, height]);
+  sim.force("center", d3.forceCenter(0, 0));
+  sim.alpha(0.3).restart();
+}
+window.addEventListener("resize", resize);
+resize();
+render();
+
+// Initialize legend
+const legendThemes = document.getElementById("legend-themes");
+Object.entries(THEME_RGB).forEach(([k,v]) => {
+  legendThemes.innerHTML += `<div class="legend-item"><span class="swatch square" style="background:${v}"></span>${escape(k)}</div>`;
+});
+const legendSources = document.getElementById("legend-sources");
+DATA.sourceGroups.forEach(k => {
+  legendSources.innerHTML += `<div class="legend-item"><span class="swatch" style="background:${SOURCE_COLOR[k]}"></span>${escape(k)}</div>`;
+});
+
+// ---------- Theme toggle ----------
+const SUN_ICO = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>';
+const MOON_ICO = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  document.getElementById("theme-ico").innerHTML = theme === "dark" ? SUN_ICO : MOON_ICO;
+  document.getElementById("theme-label").textContent = theme === "dark" ? "LIGHT" : "DARK";
+}
+let currentTheme = "light";
+applyTheme(currentTheme);
+document.getElementById("theme-toggle").onclick = () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(currentTheme);
+};
+
+</script>
+</body>
+</html>

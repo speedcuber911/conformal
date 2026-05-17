@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, ChevronRight, Clock3, Home, Loader2, MessageSquare, Send } from "lucide-react";
+import { BarChart3, ChevronRight, Clock3, Home, Loader2, MessageSquare, Network, Send } from "lucide-react";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -84,6 +84,10 @@ export function CockpitShell() {
             <BarChart3 size={17} />
             <span>Saved Reports</span>
           </Link>
+          <a href="/sfs-data-discovery-graph.html" target="_blank" rel="noreferrer" title="SFS Data Discovery Graph">
+            <Network size={17} />
+            <span>Data Graph</span>
+          </a>
         </nav>
 
         <section className="sidebar-section">
@@ -258,6 +262,10 @@ function MobileShell({ live, pinnedIds, onPinChart }: { live: boolean; pinnedIds
         <MobileTabButton active={activeTab === "chat"} icon={<MessageSquare size={21} />} label="Chat" onClick={() => setActiveTab("chat")} />
         <MobileTabButton active={activeTab === "charts"} icon={<BarChart3 size={22} />} label="Charts" onClick={() => setActiveTab("charts")} />
         <MobileTabButton active={activeTab === "history"} icon={<Clock3 size={21} />} label="History" onClick={() => setActiveTab("history")} />
+        <a className="mobile-tab" href="/sfs-data-discovery-graph.html" target="_blank" rel="noreferrer" aria-label="Open SFS Data Discovery Graph">
+          <Network size={21} />
+          <span>Graph</span>
+        </a>
       </nav>
     </section>
   );
